@@ -6,29 +6,26 @@ using System.Reflection;
 
 namespace FishNet.CodeGenerating.Helping.Extension
 {
-
     public static class ModuleDefinitionExtensions
     {
-
         /// <summary>
-        /// Gets a class within CodegenSession.Module.
+        /// Gets a class within a module.
         /// </summary>
-        /// <param name="moduleDef"></param>
+        /// <param name = "moduleDef"></param>
         /// <returns></returns>
-        public static TypeDefinition GetClass(this ModuleDefinition moduleDef, string className)
+        public static TypeDefinition GetClass(this ModuleDefinition moduleDef, string className, string namespaceName = "")
         {
-            return CodegenSession.Module.GetType(FishNetILPP.RUNTIME_ASSEMBLY_NAME, className);
-        }
+            if (namespaceName.Length == 0)
+                namespaceName = FishNetILPP.RUNTIME_ASSEMBLY_NAME;
 
-        public static TypeReference ImportReference<T>(this ModuleDefinition moduleDef)
-        {
-            return CodegenSession.ImportReference(typeof(T));
+            return moduleDef.GetType(namespaceName, className);
         }
 
         public static MethodReference ImportReference(this ModuleDefinition moduleDef, Expression<Action> expression)
         {
             return ImportReference(moduleDef, (LambdaExpression)expression);
         }
+
         public static MethodReference ImportReference<T>(this ModuleDefinition module, Expression<Action<T>> expression)
         {
             return ImportReference(module, (LambdaExpression)expression);
@@ -52,15 +49,11 @@ namespace FishNet.CodeGenerating.Helping.Extension
 
             if (expression.Body is MemberExpression memberExpression)
             {
-                var property = memberExpression.Member as PropertyInfo;
+                PropertyInfo property = memberExpression.Member as PropertyInfo;
                 return module.ImportReference(property.GetMethod);
             }
 
             throw new ArgumentException($"Invalid Expression {expression.Body.GetType()}");
         }
-
-
     }
-
-
 }

@@ -3,7 +3,7 @@
     /// <summary>
     /// Type of scopes for a scene load or unload.
     /// </summary>
-    public enum SceneScopeTypes : byte
+    public enum SceneScopeType : byte
     {
         /// <summary>
         /// Scene action occured for all clients.
@@ -14,5 +14,4 @@
         /// </summary>
         Connections = 1
     }
-
 }

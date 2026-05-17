@@ -2,13 +2,11 @@
 using FishNet.Object;
 using FishNet.Object.Helping;
 using FishNet.Object.Prediction;
-using FishNet.Object.Synchronizing;
 using MonoFN.Cecil;
-
 
 namespace FishNet.CodeGenerating.Helping
 {
-    public class AttributeHelper
+    internal class AttributeHelper : CodegenBase
     {
         #region Reflection references.
         internal string ReplicateAttribute_FullName;
@@ -18,29 +16,24 @@ namespace FishNet.CodeGenerating.Helping
         private string ServerRpcAttribute_FullName;
         private string ObserversRpcAttribute_FullName;
         private string TargetRpcAttribute_FullName;
-        private string SyncVarAttribute_FullName;
-        private string SyncObjectAttribute_FullName;
-        #endregion   
+        #endregion
 
-        internal bool ImportReferences()
+        public override bool ImportReferences()
         {
             ServerAttribute_FullName = typeof(ServerAttribute).FullName;
             ClientAttribute_FullName = typeof(ClientAttribute).FullName;
             ServerRpcAttribute_FullName = typeof(ServerRpcAttribute).FullName;
             ObserversRpcAttribute_FullName = typeof(ObserversRpcAttribute).FullName;
             TargetRpcAttribute_FullName = typeof(TargetRpcAttribute).FullName;
-            SyncVarAttribute_FullName = typeof(SyncVarAttribute).FullName;
-            SyncObjectAttribute_FullName = typeof(SyncObjectAttribute).FullName;
             ReplicateAttribute_FullName = typeof(ReplicateAttribute).FullName;
             ReconcileAttribute_FullName = typeof(ReconcileAttribute).FullName;
-
             return true;
         }
 
         /// <summary>
         /// Returns type of Rpc attributeFullName is for.
         /// </summary>
-        /// <param name="attributeFullName"></param>
+        /// <param name = "attributeFullName"></param>
         /// <returns></returns>
         public RpcType GetRpcAttributeType(CustomAttribute ca)
         {
@@ -54,11 +47,10 @@ namespace FishNet.CodeGenerating.Helping
                 return RpcType.None;
         }
 
-
         /// <summary>
         /// Returns type of Rpc attributeFullName is for.
         /// </summary>
-        /// <param name="attributeFullName"></param>
+        /// <param name = "attributeFullName"></param>
         /// <returns></returns>
         internal QolAttributeType GetQolAttributeType(string attributeFullName)
         {
@@ -69,26 +61,5 @@ namespace FishNet.CodeGenerating.Helping
             else
                 return QolAttributeType.None;
         }
-
-
-        /// <summary>
-        /// Returns if attribute if a SyncVarAttribute.
-        /// </summary>
-        /// <param name="attributeFullName"></param>
-        /// <returns></returns>
-        public bool IsSyncVarAttribute(string attributeFullName)
-        {
-            return (attributeFullName == SyncVarAttribute_FullName);
-        }
-        /// <summary>
-        /// Returns if attribute if a SyncObjectAttribute.
-        /// </summary>
-        /// <param name="attributeFullName"></param>
-        /// <returns></returns>
-        public bool IsSyncObjectAttribute(string attributeFullName)
-        {
-            return (attributeFullName == SyncObjectAttribute_FullName);
-        }
     }
-
 }

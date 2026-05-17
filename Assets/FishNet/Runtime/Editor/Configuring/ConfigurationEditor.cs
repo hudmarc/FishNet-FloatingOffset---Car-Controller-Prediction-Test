@@ -1,98 +1,112 @@
 ﻿#if UNITY_EDITOR
-using FishNet.Editing;
-using System;
-using System.IO;
-using System.Xml;
-using System.Xml.Serialization;
+using FishNet.Editing.PrefabCollectionGenerator;
+using FishNet.Object;
+using FishNet.Utility.Extension;
+using GameKit.Dependencies.Utilities;
+using System.Collections.Generic;
+using FishNet.Configuring.EditorCloning;
 using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
-namespace FishNet.Configuring.Editing
+namespace FishNet.Editing
 {
-
-    [InitializeOnLoad]
-    internal class ConfigurationEditor : EditorWindow
+    public class ConfigurationEditor : EditorWindow
     {
-
-        #region Private.
-        /// <summary>
-        /// Used to compare if ConfigurationData has changed.
-        /// </summary>
-        private static ConfigurationData _comparerConfiguration = new ConfigurationData();
-        /// <summary>
-        /// True to reload the configuration file.
-        /// </summary>
-        //[System.NonSerialized]
-        //private static bool _reloadFile = true;
-        #endregion
-
-        /// <summary>
-        /// Saves ConfigurationData to disk.
-        /// </summary>
-        private void SaveConfiguration()
-        {
-            string path = CodeStripping.GetAssetsPath(CodeStripping.CONFIG_FILE_NAME);
-            CodeStripping.ConfigurationData.Write(path, true);
-        }
-
-
-        [MenuItem("Fish-Networking/Configuration", false, 0)]
+        [MenuItem("Tools/Fish-Networking/Configuration", false, 0)]
         public static void ShowConfiguration()
         {
-            EditorWindow window = GetWindow<ConfigurationEditor>();
-            window.titleContent = new GUIContent("Fish-Networking Configuration");
-            //Dont worry about capping size until it becomes a problem.
-            //const int width = 200;
-            //const int height = 100;
-            //float x = (Screen.currentResolution.width - width);
-            //float y = (Screen.currentResolution.height - height);
-            //window.minSize = new Vector2(width, height);
-            //window.maxSize = new Vector2(x, y);
+            SettingsService.OpenProjectSettings("Project/Fish-Networking/Configuration");
         }
+    }
 
-        private void OnGUI()
+    public class DeveloperMenu : MonoBehaviour
+    {
+        #region const.
+        private const string QOL_ATTRIBUTES_DEFINE = "DISABLE_QOL_ATTRIBUTES";
+        private const string DEVELOPER_ONLY_WARNING = "If you are not a developer or were not instructed to do this by a developer things are likely to break. You have been warned.";
+        #endregion
+
+        #region QOL Attributes
+        #if DISABLE_QOL_ATTRIBUTES
+        [MenuItem("Tools/Fish-Networking/Utility/Quality of Life Attributes/Enable", false, -999)]
+        private static void EnableQOLAttributes()
         {
-            //if (_reloadFile)
-            //    Configuration.LoadConfiguration();
+            bool result = RemoveOrAddDefine(QOL_ATTRIBUTES_DEFINE, removeDefine: true);
+            if (result)
+                Debug.LogWarning($"Quality of Life Attributes have been enabled.");
+        }
+        #else
+        [MenuItem("Tools/Fish-Networking/Utility/Quality of Life Attributes/Disable", false, 0)]
+        private static void DisableQOLAttributes()
+        {
+            bool result = RemoveOrAddDefine(QOL_ATTRIBUTES_DEFINE, removeDefine: false);
+            if (result)
+                Debug.LogWarning($"Quality of Life Attributes have been disabled. {DEVELOPER_ONLY_WARNING}");
+        }
+        #endif
+        #endregion
 
-            ConfigurationData data = CodeStripping.GetConfigurationData();
+        internal static bool RemoveOrAddDefine(string define, bool removeDefine)
+        {
+            #if UNITY_6000_1_OR_NEWER
+            NamedBuildTarget activeTarget = NamedBuildTarget.FromBuildTargetGroup(EditorUserBuildSettings.selectedBuildTargetGroup);
+            #endif
 
-            if (data == null)
-                return;
-            data.CopyTo(_comparerConfiguration);
+            #if UNITY_6000_1_OR_NEWER
+            string currentDefines = PlayerSettings.GetScriptingDefineSymbols(activeTarget);
+            #else
+            string currentDefines = PlayerSettings.GetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup);
+            #endif
+            
+            HashSet<string> definesHs = new();
+            string[] currentArr = currentDefines.Split(';');
 
-            GUILayout.BeginVertical();
-            GUILayout.BeginScrollView(Vector2.zero, GUILayout.Width(500), GUILayout.Height(800));
+            // Add any define which doesn't contain MIRROR.
+            foreach (string item in currentArr)
+                definesHs.Add(item);
 
-            GUILayout.Space(10f);
+            int startingCount = definesHs.Count;
 
-            GUILayout.BeginHorizontal();
-            GUILayout.Space(10f);
-            GUILayout.Box(EditingConstants.PRO_ASSETS_LOCKED_TEXT, GUILayout.Width(200f));
-            GUILayout.EndHorizontal();
-            GUILayout.Space(5f);
+            if (removeDefine)
+                definesHs.Remove(define);
+            else
+                definesHs.Add(define);
 
-            GUILayout.BeginHorizontal();
-            GUILayout.Space(20f);
-            data.StripReleaseBuilds = EditorGUILayout.ToggleLeft("* Strip Release Builds", data.StripReleaseBuilds);
-            GUILayout.EndHorizontal();
-
-            if (data.StripReleaseBuilds)
+            bool modified = definesHs.Count != startingCount;
+            if (modified)
             {
-                GUILayout.BeginHorizontal();
-                GUILayout.Space(40f);
-                GUILayout.Box("NOTICE: development builds will not have code stripped. Additionally, if you plan to run as host disable code stripping.", GUILayout.Width(170f));
-                GUILayout.EndHorizontal();
+                string changedDefines = string.Join(";", definesHs);
+                #if UNITY_6000_1_OR_NEWER
+                PlayerSettings.SetScriptingDefineSymbols(activeTarget, changedDefines);
+                #else
+                PlayerSettings.SetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup, changedDefines);
+                #endif
             }
 
-
-            GUILayout.EndScrollView();
-            GUILayout.EndVertical();
-
-            if (data.HasChanged(_comparerConfiguration))
-                SaveConfiguration();
+            return modified;
         }
+    }
 
+    public class RefreshDefaultPrefabsMenu : MonoBehaviour
+    {
+        /// <summary>
+        /// Rebuilds the DefaultPrefabsCollection file.
+        /// </summary>
+        [MenuItem("Tools/Fish-Networking/Utility/Refresh Default Prefabs", false, 300)]
+        public static void RebuildDefaultPrefabs()
+        {
+            if (!CloneChecker.CanGenerateFiles())
+            {
+                Debug.Log("Skipping prefab generation as clone settings does not allow it.");
+                return;
+            }
+            Debug.Log("Refreshing default prefabs.");
+            Generator.GenerateFull(null, true);
+        }
     }
 }
+
 #endif

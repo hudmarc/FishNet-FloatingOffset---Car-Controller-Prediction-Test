@@ -14,8 +14,7 @@ namespace FishNet.Managing.Editing
         private SerializedProperty _dontDestroyOnLoad;
         private SerializedProperty _persistence;
         private SerializedProperty _spawnablePrefabs;
-        private SerializedProperty _incomingIterationOrder;
-        private SerializedProperty _outgoingIterationOrder;
+        private SerializedProperty _objectPool;
 
         private void OnEnable()
         {
@@ -25,8 +24,7 @@ namespace FishNet.Managing.Editing
             _dontDestroyOnLoad = serializedObject.FindProperty("_dontDestroyOnLoad");
             _persistence = serializedObject.FindProperty("_persistence");
             _spawnablePrefabs = serializedObject.FindProperty("_spawnablePrefabs");
-            _incomingIterationOrder = serializedObject.FindProperty("_incomingIterationOrder");
-            _outgoingIterationOrder = serializedObject.FindProperty("_outgoingIterationOrder");
+            _objectPool = serializedObject.FindProperty("_objectPool");
         }
 
         public override void OnInspectorGUI()
@@ -39,8 +37,8 @@ namespace FishNet.Managing.Editing
             EditorGUILayout.ObjectField("Script:", MonoScript.FromMonoBehaviour(networkManager), typeof(NetworkManager), false);
             GUI.enabled = true;
 
-            //EditorGUILayout.BeginVertical(GUI.skin.box);
-            //EditorGUILayout.EndVertical();
+            // EditorGUILayout.BeginVertical(GUI.skin.box);
+            // EditorGUILayout.EndVertical();
 
 
             EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
@@ -60,31 +58,11 @@ namespace FishNet.Managing.Editing
             EditorGUILayout.LabelField("Prefabs", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(_spawnablePrefabs);
+            EditorGUILayout.PropertyField(_objectPool);
             EditorGUILayout.PropertyField(_refreshDefaultPrefabs);
-            ////Show manual refresh button if not auto refresh.
-            //if (_refreshDefaultPrefabs.boolValue == false)
-            //{
-            //    using (GUILayout.HorizontalScope hs = new GUILayout.HorizontalScope())
-            //    {
-            //        GUILayout.Space(15f);
-            //        if (GUILayout.Button("Manually Refresh Default Prefabs"))
-            //        {
-            //            if (networkManager.SpawnablePrefabs != null && networkManager.SpawnablePrefabs is DefaultPrefabObjects dpo)
-            //                dpo.PopulateDefaultPrefabs(true, true);
-            //        }      
-            //    }
 
-            //}
             EditorGUI.indentLevel--;
             EditorGUILayout.Space();
-
-
-            //EditorGUILayout.LabelField("Experimental", EditorStyles.boldLabel);
-            //EditorGUI.indentLevel++;
-            //EditorGUILayout.PropertyField(_incomingIterationOrder);
-            //EditorGUILayout.PropertyField(_outgoingIterationOrder);
-            //EditorGUILayout.Space();
-            //EditorGUI.indentLevel--;
 
             serializedObject.ApplyModifiedProperties();
         }

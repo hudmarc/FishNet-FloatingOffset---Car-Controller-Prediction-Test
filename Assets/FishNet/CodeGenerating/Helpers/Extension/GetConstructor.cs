@@ -6,26 +6,25 @@ using UnityEngine;
 
 namespace FishNet.CodeGenerating.Helping
 {
-    public static class Constructors
+    internal static class Constructors
     {
+        /// <summary>
+        /// Gets the first constructor that optionally has, or doesn't have parameters.
+        /// </summary>
+        /// <param name = "typeRef"></param>
+        /// <returns></returns>
+        public static MethodDefinition GetFirstConstructor(this TypeReference typeRef, CodegenSession session, bool requireParameters)
+        {
+            return typeRef.CachedResolve(session).GetFirstConstructor(requireParameters);
+        }
 
         /// <summary>
         /// Gets the first constructor that optionally has, or doesn't have parameters.
         /// </summary>
-        /// <param name="typeRef"></param>
-        /// <returns></returns>
-        public static MethodDefinition GetFirstConstructor(this TypeReference typeRef, bool requireParameters)
-        {
-            return typeRef.CachedResolve().GetFirstConstructor(requireParameters);
-        }
-        /// <summary>
-        /// Gets the first constructor that optionally has, or doesn't have parameters.
-        /// </summary>
-        /// <param name="typeRef"></param>
+        /// <param name = "typeRef"></param>
         /// <returns></returns>
         public static MethodDefinition GetFirstConstructor(this TypeDefinition typeDef, bool requireParameters)
         {
-
             foreach (MethodDefinition methodDef in typeDef.Methods)
             {
                 if (methodDef.IsConstructor && methodDef.IsPublic)
@@ -35,7 +34,6 @@ namespace FishNet.CodeGenerating.Helping
                     else if (!requireParameters && methodDef.Parameters.Count == 0)
                         return methodDef;
                 }
-
             }
 
             return null;
@@ -45,15 +43,16 @@ namespace FishNet.CodeGenerating.Helping
         /// Gets the first public constructor with no parameters.
         /// </summary>
         /// <returns></returns>
-        public static MethodDefinition GetConstructor(this TypeReference typeRef)
+        public static MethodDefinition GetDefaultConstructor(this TypeReference typeRef, CodegenSession session)
         {
-            return typeRef.CachedResolve().GetConstructor();
+            return typeRef.CachedResolve(session).GetDefaultConstructor();
         }
+
         /// <summary>
         /// Gets the first public constructor with no parameters.
         /// </summary>
         /// <returns></returns>
-        public static MethodDefinition GetConstructor(this TypeDefinition typeDef)
+        public static MethodDefinition GetDefaultConstructor(this TypeDefinition typeDef)
         {
             foreach (MethodDefinition methodDef in typeDef.Methods)
             {
@@ -70,7 +69,7 @@ namespace FishNet.CodeGenerating.Helping
         /// <returns></returns>
         public static List<MethodDefinition> GetConstructors(this TypeDefinition typeDef)
         {
-            List<MethodDefinition> lst = new List<MethodDefinition>();
+            List<MethodDefinition> lst = new();
             foreach (MethodDefinition methodDef in typeDef.Methods)
             {
                 if (methodDef.IsConstructor)
@@ -80,25 +79,24 @@ namespace FishNet.CodeGenerating.Helping
             return lst;
         }
 
-
         /// <summary>
         /// Gets constructor which has arguments.
         /// </summary>
-        /// <param name="typeRef"></param>
+        /// <param name = "typeRef"></param>
         /// <returns></returns>
-        public static MethodDefinition GetConstructor(this TypeReference typeRef, Type[] arguments)
+        public static MethodDefinition GetConstructor(this TypeReference typeRef, CodegenSession session, Type[] arguments)
         {
-            return typeRef.CachedResolve().GetConstructor(arguments);
+            return typeRef.CachedResolve(session).GetConstructor(arguments);
         }
 
         /// <summary>
         /// Gets constructor which has arguments.
         /// </summary>
-        /// <param name="typeDef"></param>
+        /// <param name = "typeDef"></param>
         /// <returns></returns>
         public static MethodDefinition GetConstructor(this TypeDefinition typeDef, Type[] arguments)
         {
-            Type[] argsCopy = (arguments == null) ? new Type[0] : arguments;
+            Type[] argsCopy = arguments == null ? new Type[0] : arguments;
             foreach (MethodDefinition methodDef in typeDef.Methods)
             {
                 if (methodDef.IsConstructor && methodDef.IsPublic && methodDef.Parameters.Count == argsCopy.Length)
@@ -120,25 +118,24 @@ namespace FishNet.CodeGenerating.Helping
             return null;
         }
 
-
         /// <summary>
         /// Gets constructor which has arguments.
         /// </summary>
-        /// <param name="typeRef"></param>
+        /// <param name = "typeRef"></param>
         /// <returns></returns>
-        public static MethodDefinition GetConstructor(this TypeReference typeRef, TypeReference[] arguments)
+        public static MethodDefinition GetConstructor(this TypeReference typeRef, CodegenSession session, TypeReference[] arguments)
         {
-            return typeRef.CachedResolve().GetConstructor(arguments);
+            return typeRef.CachedResolve(session).GetConstructor(arguments);
         }
 
         /// <summary>
         /// Gets constructor which has arguments.
         /// </summary>
-        /// <param name="typeDef"></param>
+        /// <param name = "typeDef"></param>
         /// <returns></returns>
         public static MethodDefinition GetConstructor(this TypeDefinition typeDef, TypeReference[] arguments)
         {
-            TypeReference[] argsCopy = (arguments == null) ? new TypeReference[0] : arguments;
+            TypeReference[] argsCopy = arguments == null ? new TypeReference[0] : arguments;
             foreach (MethodDefinition methodDef in typeDef.Methods)
             {
                 if (methodDef.IsConstructor && methodDef.IsPublic && methodDef.Parameters.Count == argsCopy.Length)
@@ -163,18 +160,17 @@ namespace FishNet.CodeGenerating.Helping
         /// <summary>
         /// Resolves the constructor with parameterCount for typeRef.
         /// </summary>
-        /// <param name="typeRef"></param>
+        /// <param name = "typeRef"></param>
         /// <returns></returns>
-        public static MethodDefinition GetConstructor(this TypeReference typeRef, int parameterCount)
+        public static MethodDefinition GetConstructor(this TypeReference typeRef, CodegenSession session, int parameterCount)
         {
-            return typeRef.CachedResolve().GetConstructor(parameterCount);
+            return typeRef.CachedResolve(session).GetConstructor(parameterCount);
         }
-
 
         /// <summary>
         /// Resolves the constructor with parameterCount for typeRef.
         /// </summary>
-        /// <param name="typeDef"></param>
+        /// <param name = "typeDef"></param>
         /// <returns></returns>
         public static MethodDefinition GetConstructor(this TypeDefinition typeDef, int parameterCount)
         {
@@ -186,6 +182,4 @@ namespace FishNet.CodeGenerating.Helping
             return null;
         }
     }
-
-
 }

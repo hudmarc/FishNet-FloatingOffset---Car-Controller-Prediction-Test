@@ -74,3 +74,9 @@ crashlytics-build.properties
 # other assets
 /[Aa]ssets/[Pp]arrelSync/
 /[Aa]ssets/[Pp]arrelSync.meta
+
+# MacOS
+.DS*
+
+# FishNet
+/Assets/FishNet

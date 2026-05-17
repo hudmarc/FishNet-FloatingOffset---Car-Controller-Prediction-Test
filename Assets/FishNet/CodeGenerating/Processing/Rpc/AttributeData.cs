@@ -7,14 +7,13 @@ namespace FishNet.CodeGenerating.Processing.Rpc
 {
     internal static class AttributeDataExtensions
     {
-
         /// <summary>
         /// Returns RpcTypes in datas.
         /// </summary>
         public static List<RpcType> GetRpcTypes(this List<AttributeData> datas)
         {
-            //RpcTypes for originalMd.
-            List<RpcType> rpcTypes = new List<RpcType>();
+            // RpcTypes for originalMd.
+            List<RpcType> rpcTypes = new();
             foreach (AttributeData ad in datas)
                 rpcTypes.Add(ad.RpcType);
 
@@ -24,7 +23,7 @@ namespace FishNet.CodeGenerating.Processing.Rpc
         /// <summary>
         /// Gets CustomAttribute for rpcType
         /// </summary>
-        public static CustomAttribute GetAttribute(this List<AttributeData> datas, RpcType rpcType)
+        public static CustomAttribute GetAttribute(this List<AttributeData> datas, CodegenSession session, RpcType rpcType)
         {
             for (int i = 0; i < datas.Count; i++)
             {
@@ -32,15 +31,14 @@ namespace FishNet.CodeGenerating.Processing.Rpc
                     return datas[i].Attribute;
             }
 
-            CodegenSession.LogError($"RpcType {rpcType} not found in datas.");
+            session.LogError($"RpcType {rpcType} not found in datas.");
             return null;
         }
-
 
         /// <summary>
         /// Returns RpcType as flag through combining datas.
         /// </summary>
-        /// <param name="datas"></param>
+        /// <param name = "datas"></param>
         /// <returns></returns>
         public static RpcType GetCombinedRpcType(this List<AttributeData> datas)
         {
@@ -62,7 +60,5 @@ namespace FishNet.CodeGenerating.Processing.Rpc
             Attribute = attribute;
             RpcType = rpcType;
         }
-
     }
-
 }

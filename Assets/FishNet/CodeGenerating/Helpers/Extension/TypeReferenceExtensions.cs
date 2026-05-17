@@ -6,119 +6,50 @@ using UnityEngine;
 
 namespace FishNet.CodeGenerating.Helping.Extension
 {
-
-    internal static class TypeReferenceExtensions
+    internal static class TypeReferenceExtensionsOld
     {
+        /// <summary>
+        /// Gets a Resolve favoring cached results first.
+        /// </summary>
+        internal static TypeDefinition CachedResolve(this TypeReference typeRef, CodegenSession session)
+        {
+            return session.GetClass<GeneralHelper>().GetTypeReferenceResolve(typeRef);
+        }
 
         /// <summary>
         /// Returns if typeRef is a class or struct.
         /// </summary>
-        internal static bool IsClassOrStruct(this TypeReference typeRef)
+        internal static bool IsClassOrStruct(this TypeReference typeRef, CodegenSession session)
         {
-            TypeDefinition typeDef = typeRef.CachedResolve();
-            return (!typeDef.IsPrimitive && (typeDef.IsClass || typeDef.IsValueType));
+            TypeDefinition typeDef = typeRef.CachedResolve(session);
+            return !typeDef.IsPrimitive && !typeDef.IsEnum && (typeDef.IsClass || typeDef.IsValueType);
+        }
+
+        /// <summary>
+        /// Returns all properties on typeRef and all base types which have a public get/set accessor.
+        /// </summary>
+        /// <param name = "typeRef"></param>
+        /// <returns></returns>
+        public static IEnumerable<PropertyDefinition> FindAllSerializableProperties(this TypeReference typeRef, CodegenSession session, Type[] excludedBaseTypes = null, string[] excludedAssemblyPrefixes = null)
+        {
+            return typeRef.CachedResolve(session).FindAllPublicProperties(session, excludedBaseTypes, excludedAssemblyPrefixes);
         }
 
         /// <summary>
         /// Gets all public fields in typeRef and base type.
         /// </summary>
-        /// <param name="typeRef"></param>
+        /// <param name = "typeRef"></param>
         /// <returns></returns>
-        public static IEnumerable<FieldDefinition> FindAllPublicFields(this TypeReference typeRef)
+        public static IEnumerable<FieldDefinition> FindAllSerializableFields(this TypeReference typeRef, CodegenSession session, Type[] excludedBaseTypes = null, string[] excludedAssemblyPrefixes = null)
         {
-            return FindAllPublicFields(typeRef.CachedResolve());
-        }
-
-        /// <summary>
-        /// Gets a Resolve favoring cached results first.
-        /// </summary>
-        internal static TypeDefinition CachedResolve(this TypeReference typeRef)
-        {
-            return CodegenSession.GeneralHelper.GetTypeReferenceResolve(typeRef);
-        }
-
-        /// <summary>
-        /// Finds public fields in type and base type
-        /// </summary>
-        /// <param name="variable"></param>
-        /// <returns></returns>
-        public static IEnumerable<FieldDefinition> FindAllPublicFields(this TypeDefinition typeDefinition)
-        {
-            while (typeDefinition != null)
-            {
-                foreach (FieldDefinition field in typeDefinition.Fields)
-                {
-                    if (field.IsStatic || field.IsPrivate)
-                        continue;
-
-                    if (field.IsNotSerialized)
-                        continue;
-
-                    yield return field;
-                }
-
-                try
-                {
-                    typeDefinition = typeDefinition.BaseType?.CachedResolve();
-                }
-                catch
-                {
-                    break;
-                }
-            }
-        }
-
-
-        /// <summary>
-        /// Returns a method within the base type of typeRef.
-        /// </summary>
-        /// <param name="typeRef"></param>
-        /// <param name="methodName"></param>
-        /// <returns></returns>
-        public static MethodDefinition GetMethodInBase(this TypeReference typeRef, string methodName)
-        {
-            TypeDefinition td = typeRef.CachedResolve().GetNextBaseClass();
-            while (td != null)
-            {
-                Debug.LogWarning(td.Name);
-                foreach (MethodDefinition md in td.Methods)
-                {
-                    Debug.Log("X " + md.Name);
-                    if (md.Name == methodName)
-                    {
-                        return md;
-
-                        //MethodReference method = md;
-                        //if (typeRefCopy.IsGenericInstance)
-                        //{
-                        //    var baseTypeInstance = (GenericInstanceType)typeRef;
-                        //    method = method.MakeHostInstanceGeneric(baseTypeInstance);
-                        //}
-
-                        //return method;
-                    }
-                }
-
-                try
-                {
-                    td = td.GetNextBaseClass();
-                }
-                /* This may occur when inheriting from a class
-                 * in another assembly. */
-                catch (AssemblyResolutionException)
-                {
-                    break;
-                }
-            }
-
-            return null;
+            return typeRef.Resolve().FindAllPublicFields(session, excludedBaseTypes, excludedAssemblyPrefixes);
         }
 
         /// <summary>
         /// Returns if a typeRef is type.
         /// </summary>
-        /// <param name="typeRef"></param>
-        /// <param name="type"></param>
+        /// <param name = "typeRef"></param>
+        /// <param name = "type"></param>
         /// <returns></returns>
         public static bool IsType(this TypeReference typeRef, Type type)
         {
@@ -128,25 +59,25 @@ namespace FishNet.CodeGenerating.Helping.Extension
                 return typeRef.FullName == type.FullName;
         }
 
-
-
         /// <summary>
         /// Returns if typeRef is a multidimensional array.
         /// </summary>
-        /// <param name="typeRef"></param>
+        /// <param name = "typeRef"></param>
         /// <returns></returns>
         public static bool IsMultidimensionalArray(this TypeReference typeRef)
         {
-            return typeRef is ArrayType arrayType && arrayType.Rank > 1;
-        }
+            if (typeRef is ArrayType && typeRef.Name.Contains("[][]"))
+                return true;
 
+            return false;
+        }
 
         /// <summary>
         /// Returns if typeRef can be resolved.
         /// </summary>
-        /// <param name="typeRef"></param>
+        /// <param name = "typeRef"></param>
         /// <returns></returns>
-        public static bool CanBeResolved(this TypeReference typeRef)
+        public static bool CanBeResolved(this TypeReference typeRef, CodegenSession session)
         {
             while (typeRef != null)
             {
@@ -157,13 +88,13 @@ namespace FishNet.CodeGenerating.Helping.Extension
 
                 if (typeRef.Scope.Name == "mscorlib")
                 {
-                    TypeDefinition resolved = typeRef.CachedResolve();
+                    TypeDefinition resolved = typeRef.CachedResolve(session);
                     return resolved != null;
                 }
 
                 try
                 {
-                    typeRef = typeRef.CachedResolve().BaseType;
+                    typeRef = typeRef.CachedResolve(session).BaseType;
                 }
                 catch
                 {
@@ -176,14 +107,14 @@ namespace FishNet.CodeGenerating.Helping.Extension
         /// <summary>
         /// Creates a generic type out of another type, if needed.
         /// </summary>
-        /// <param name="type"></param>
+        /// <param name = "type"></param>
         /// <returns></returns>
         public static TypeReference ConvertToGenericIfNeeded(this TypeDefinition type)
         {
             if (type.HasGenericParameters)
             {
                 // get all the generic parameters and make a generic instance out of it
-                var genericTypes = new TypeReference[type.GenericParameters.Count];
+                TypeReference[] genericTypes = new TypeReference[type.GenericParameters.Count];
                 for (int i = 0; i < type.GenericParameters.Count; i++)
                 {
                     genericTypes[i] = type.GenericParameters[i].GetElementType();
@@ -196,7 +127,5 @@ namespace FishNet.CodeGenerating.Helping.Extension
                 return type;
             }
         }
-
     }
-
 }

@@ -1,107 +1,133 @@
 using FishNet.Documenting;
-using FishNet.Object.Helping;
 using System.Collections.Generic;
 using UnityEngine;
+using GameKit.Dependencies.Utilities;
+using System.Text;
 #if UNITY_EDITOR
-using FishNet.Editing;
 using UnityEditor;
 #endif
 using FishNet.Object;
 
 namespace FishNet.Managing.Object
 {
-
     [APIExclude]
-    //[CreateAssetMenu(fileName = "New DefaultPrefabObjects", menuName = "FishNet/Spawnable Prefabs/Default Prefab Objects")]
+    // [CreateAssetMenu(fileName = "New DefaultPrefabObjects", menuName = "FishNet/Spawnable Prefabs/Default Prefab Objects")]
     public class DefaultPrefabObjects : SinglePrefabObjects
     {
         /// <summary>
-        /// True if this can be automatically populated.
+        /// Used for version rebuilding.
         /// </summary>
-        internal static bool CanAutomate = true;
+        private StringBuilder _stringBuilder = new();
+
 
         /// <summary>
-        /// True if this refreshed while playing.
-        /// </summary>
-        [System.NonSerialized]
-        private bool _refreshedWhilePlaying = false;
+        /// Sets asset path hashes for prefabs starting at index, or if missing.
+        /// </summary
+        /// <return>Returns true if one or more NetworkObjects were updated.</return>
+        internal bool SetAssetPathHashes(int index)
+        {
+            #if UNITY_EDITOR
+            bool dirtied = false;
+            int count = base.GetObjectCount();
+
+            if (count == 0)
+                return false;
+            
+            if (index < 0 || index >= count)
+            {
+                Debug.LogError($"Index {index} is out of range when trying to set asset path hashes. Collection length is {count}. Defaulf prefabs may need to be rebuilt.");
+                return false;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                NetworkObject n = Prefabs[i];
+                if (i < index)
+                    continue;
+
+                string pathAndName = $"{AssetDatabase.GetAssetPath(n.gameObject)}{n.gameObject.name}".Trim().ToLowerInvariant();
+
+                _stringBuilder.Clear();
+                foreach (char c in pathAndName)
+                {
+                    if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+                        _stringBuilder.Append(c);
+                }
+                
+                ulong hashcode = _stringBuilder.ToString().GetStableHashU64();
+                // Already set.
+                if (n.AssetPathHash == hashcode)
+                    continue;
+
+                n.SetAssetPathHash(hashcode);
+                EditorUtility.SetDirty(n);
+                dirtied = true;
+            }
+
+            //Check for conflicts.
+            Dictionary<ulong, string> hashesAndPaths = new();
+            for (int i = 0; i < count; i++)
+            {
+                NetworkObject n = Prefabs[i];
+
+                string pathAndName = $"{AssetDatabase.GetAssetPath(n.gameObject)}{n.gameObject.name}";
+                
+                if (hashesAndPaths.TryGetValueIL2CPP(n.AssetPathHash, out string path)) 
+                {
+                    Debug.LogError($"Assets {pathAndName} and {path} have the same assetPath hash of {n.AssetPathHash}. Please modify the prefab name of either to resolve.");
+                    dirtied = false;
+                }
+                else
+                {
+                    hashesAndPaths.Add(n.AssetPathHash, pathAndName);
+                }
+            }
+            
+            return dirtied;
+            #else
+            return false;
+            #endif
+        }
 
         /// <summary>
         /// Sorts prefabs by name and path hashcode.
         /// </summary>
         internal void Sort()
         {
-#if UNITY_EDITOR
             if (base.GetObjectCount() == 0)
                 return;
 
-            Dictionary<ulong, NetworkObject> hashcodesAndNobs = new Dictionary<ulong, NetworkObject>();
-            List<ulong> hashcodes = new List<ulong>();
+            Dictionary<ulong, NetworkObject> hashcodesAndNobs = new();
+            List<ulong> hashcodes = new();
 
-            foreach (NetworkObject n in base.Prefabs)
+            bool error = false;
+            foreach (NetworkObject n in Prefabs)
             {
-                string pathAndName = $"{AssetDatabase.GetAssetPath(n.gameObject)}{n.gameObject.name}";
-                ulong hashcode = Hashing.GetStableHash64(pathAndName);
-                hashcodesAndNobs[hashcode] = n;
-                hashcodes.Add(hashcode);
+                hashcodes.Add(n.AssetPathHash);
+                // If hashcode is 0 something is wrong
+                if (n.AssetPathHash == 0)
+                {
+                    error = true;
+                    Debug.LogError($"AssetPathHash is not set for GameObject {n.name}.");
+                }
+                hashcodesAndNobs.Add(n.AssetPathHash, n);
+            }
+            // An error occured, no reason to continue.
+            if (error)
+            {
+                Debug.LogError($"One or more NetworkObject prefabs did not have their AssetPathHash set. This usually occurs when a prefab cannot be saved. Check the specified prefabs for missing scripts or serialization errors and correct them, then use Fish-Networking -> Refresh Default Prefabs.");
+                return;
             }
 
-            //Once all hashes have been made re-add them to prefabs sorted.
+            // Once all hashes have been made re-add them to prefabs sorted.
             hashcodes.Sort();
-            //Build to a new list using sorted hashcodes.
-            List<NetworkObject> sortedNobs = new List<NetworkObject>();
+            // Build to a new list using sorted hashcodes.
+            List<NetworkObject> sortedNobs = new();
             foreach (ulong hc in hashcodes)
                 sortedNobs.Add(hashcodesAndNobs[hc]);
 
             base.Clear();
-            base.AddObjects(sortedNobs, false);
-#endif
+            base.AddObjects(sortedNobs, checkForDuplicates: false, initializeAdded: false);
         }
-
-        /// <summary>
-        /// Populates this DefaultPrefabObjects.
-        /// </summary>
-        internal void AutoPopulateDefaultPrefabs(bool log = true, bool clear = true)
-        {
-            if (!CanAutomate)
-            {
-                Debug.Log("Auto populating DefaultPrefabs is blocked.");
-                return;
-            }
-
-            PopulateDefaultPrefabs(log, clear);
-        }
-
-        /// <summary>
-        /// Populates this DefaultPrefabObjects.
-        /// </summary>
-        internal void PopulateDefaultPrefabs(bool log = true, bool clear = true)
-        {
-#if UNITY_EDITOR
-            DefaultPrefabsFinder.PopulateDefaultPrefabs(log, clear);
-#endif
-        }
-        /* Try to recover invalid/null prefab errors in editor.
-         * This can occur when simlinking or when the asset processor
-         * doesn't function properly. */
-        public override NetworkObject GetObject(bool asServer, int id)
-        {
-            //Only error check cases where the collection may be wrong.
-            bool error = (id >= base.Prefabs.Count ||
-                base.Prefabs[id] == null);
-
-            if (error && !_refreshedWhilePlaying)
-            {
-                //This prevents the list from trying to populate several times before exiting play mode.
-                _refreshedWhilePlaying = true;
-                AutoPopulateDefaultPrefabs(false);
-            }
-
-            return base.GetObject(asServer, id);
-        }
-
-
-
     }
-
 }

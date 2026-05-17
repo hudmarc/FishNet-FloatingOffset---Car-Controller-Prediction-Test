@@ -1,174 +1,185 @@
-﻿using FishNet.CodeGenerating.Helping.Extension;
+﻿using System;
+using FishNet.CodeGenerating.Extension;
+using FishNet.CodeGenerating.Helping.Extension;
 using FishNet.Object;
+using FishNet.Serializing.Helping;
+using FishNet.Utility.Performance;
 using MonoFN.Cecil;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace FishNet.CodeGenerating.Helping
 {
-
-
-    internal static class GeneratorHelper
+    internal class GeneratorHelper : CodegenBase
     {
         /// <summary>
         /// Gets what objectTypeRef will be serialized as.
         /// </summary>
-        /// <param name="objectTr"></param>
-        /// <param name="writer"></param>
-        /// <param name="objectTd"></param>
-        /// <param name="diagnostics"></param>
-        /// <returns></returns>
-        internal static SerializerType GetSerializerType(TypeReference objectTr, bool writer, out TypeDefinition objectTd)
+        /// <param name="typeTrace">A trace of what led up to the type needing to be serialized.</param>
+        public SerializerType GetSerializerType(TypeReference objectTr, bool writer, out TypeDefinition objectTd, string typeTrace)
         {
-            string errorPrefix = (writer) ? "CreateWrite: " : "CreateRead: ";
+            string errorPrefix = writer ? "CreateWrite: " : "CreateRead: ";
             objectTd = null;
 
             /* Check if already has a serializer. */
             if (writer)
             {
-                if (CodegenSession.WriterHelper.GetFavoredWriteMethodReference(objectTr, true) != null)
+                if (GetClass<WriterProcessor>().GetWriteMethodReference(objectTr) != null)
                 {
-                    CodegenSession.LogError($"Writer already exist for {objectTr.FullName}.");
+                    LogError(GetLogTextWithTrace($"Writer already exist for {objectTr.FullName}."));
                     return SerializerType.Invalid;
                 }
             }
             else
             {
-                if (CodegenSession.ReaderHelper.GetFavoredReadMethodReference(objectTr, true) != null)
+                if (GetClass<ReaderProcessor>().GetReadMethodReference(objectTr) != null)
                 {
-                    CodegenSession.LogError($"Reader already exist for {objectTr.FullName}.");
+                    LogError(GetLogTextWithTrace($"Reader already exist for {objectTr.FullName}."));
                     return SerializerType.Invalid;
                 }
             }
 
-            objectTd = objectTr.CachedResolve();
-            //Invalid typeDef.
+            objectTd = objectTr.CachedResolve(Session);
+            // Invalid typeDef.
             if (objectTd == null)
             {
-                CodegenSession.LogError($"{errorPrefix}{objectTd.FullName} could not be resolved.");
+                LogError(GetLogTextWithTrace($"{errorPrefix}{objectTd.FullName} could not be resolved."));
                 return SerializerType.Invalid;
             }
-            //By reference.            
+            // Intentionally excluded.
+            if (objectTd.CustomAttributes.Count > 0)
+            {
+                foreach (CustomAttribute item in objectTd.CustomAttributes)
+                {
+                    if (item.AttributeType.Is(typeof(ExcludeSerializationAttribute)))
+                        return SerializerType.Invalid;
+                }
+            }
+
+            // By reference.            
             if (objectTr.IsByReference)
             {
-                CodegenSession.LogError($"{errorPrefix}Cannot pass {objectTr.Name} by reference");
+                LogError(GetLogTextWithTrace($"{errorPrefix}Cannot pass {objectTr.Name} by reference."));
                 return SerializerType.Invalid;
             }
+
             /* Arrays have to be processed first because it's possible for them to meet other conditions
              * below and be processed wrong. */
-            else if (objectTr.IsArray)
+            if (objectTr.IsArray)
             {
                 if (objectTr.IsMultidimensionalArray())
                 {
-                    CodegenSession.LogError($"{errorPrefix}{objectTr.Name} is an unsupported type. Multidimensional arrays are not supported");
+                    LogError(GetLogTextWithTrace($"{errorPrefix}{objectTr.Name} is an unsupported type. Multidimensional arrays are not supported."));
                     return SerializerType.Invalid;
                 }
-                else
-                {
-                    return SerializerType.Array;
-                }
+
+                return SerializerType.Array;
             }
-            //Enum.
-            else if (objectTd.IsEnum)
-            {
+
+            // Enum.
+            if (objectTd.IsEnum)
                 return SerializerType.Enum;
-            }
-            else if (objectTd.Is(typeof(Dictionary<,>)))
-            {
+
+            if (objectTd.Is(typeof(Dictionary<,>)))
                 return SerializerType.Dictionary;
-            }
-            else if (objectTd.Is(typeof(List<>)))
-            {
+
+            if (objectTd.Is(typeof(List<>)))
                 return SerializerType.List;
-            }
-            else if (objectTd.InheritsFrom<NetworkBehaviour>())
-            {
+
+            if (objectTd.Is(typeof(HashSet<>)))
+                return SerializerType.HashSet;
+
+            if (objectTd.InheritsFrom<NetworkBehaviour>(Session))
                 return SerializerType.NetworkBehaviour;
-            }
-            else if (objectTr.Name == typeof(System.Nullable<>).Name)
+
+            if (objectTr.IsNullable(Session))
             {
                 GenericInstanceType git = objectTr as GenericInstanceType;
-                if (git.GenericArguments.Count != 1)
+                if (git == null || git.GenericArguments.Count != 1)
                     return SerializerType.Invalid;
-                else
-                    return SerializerType.Nullable;
-            }
-            //Invalid type. This must be called after trying to generate everything but class.
-            else if (!GeneratorHelper.IsValidSerializeType(objectTd))
-            {
-                return SerializerType.Invalid;
-            }
-            //If here then the only type left is struct or class.
-            else if (objectTr.IsClassOrStruct())
-            {
-                return SerializerType.ClassOrStruct;
-            }
-            //Unknown type.
-            else
-            {
-                CodegenSession.LogError($"{errorPrefix}{objectTr.Name} is an unsupported type. Mostly because we don't know what the heck it is. Please let us know so we can fix this.");
-                return SerializerType.Invalid;
-            }
-        }
 
+                return SerializerType.Nullable;
+            }
+
+            // Invalid type. This must be called after trying to generate everything but class.
+            if (!CanGenerateSerializer(objectTd))
+                return SerializerType.Invalid;
+
+            // If here then the only type left is struct or class.
+            if (objectTr.IsClassOrStruct(Session))
+                return SerializerType.ClassOrStruct;
+  
+            if (objectTr.FullName == typeof(System.IntPtr).FullName) 
+            {
+                LogError(GetLogTextWithTrace($"{errorPrefix}{objectTr.FullName} is an unsupported type."));
+                return SerializerType.Invalid;
+            }
+
+            // Unknown type.
+            LogError(GetLogTextWithTrace($"{errorPrefix}{objectTr.FullName} is an unsupported type. Mostly because we don't know what the heck it is. Please let us know so we can fix this."));
+            
+            return SerializerType.Invalid;
+            
+            string GetLogTextWithTrace(string txt) => $"{txt} Trace: {typeTrace}.";
+        }
 
         /// <summary>
-        /// Returns if objectTypeRef is an invalid type, which cannot be serialized.
+        /// Returns if objectTd can have a serializer generated for it.
         /// </summary>
-        /// <param name="objectTd"></param>
-        /// <returns></returns> 
-        private static bool IsValidSerializeType(TypeDefinition objectTd)
+        private bool CanGenerateSerializer(TypeDefinition objectTd)
         {
             string errorText = $"{objectTd.Name} is not a supported type. Use a supported type or provide a custom serializer";
-            //Unable to determine type, cannot generate for.
+
+            System.Type unityObjectType = typeof(UnityEngine.Object);
+            // Unable to determine type, cannot generate for.
             if (objectTd == null)
             {
-                CodegenSession.LogError(errorText);
+                LogError(errorText);
                 return false;
             }
-            //Component.
-            if (objectTd.InheritsFrom<UnityEngine.Component>())
+            // Component.
+            if (objectTd.InheritsFrom<UnityEngine.Component>(Session))
             {
-                CodegenSession.LogError(errorText);
+                LogError(errorText);
                 return false;
             }
-            //Unity Object.
-            if (objectTd.Is(typeof(UnityEngine.Object)))
+            // Unity Object.
+            if (objectTd.Is(unityObjectType))
             {
-                CodegenSession.LogError(errorText);
+                LogError(errorText);
                 return false;
             }
-            //ScriptableObject.
+            // ScriptableObject.
             if (objectTd.Is(typeof(UnityEngine.ScriptableObject)))
             {
-                CodegenSession.LogError(errorText);
+                LogError(errorText);
                 return false;
             }
-            //Has generic parameters.
+            // Has generic parameters.
             if (objectTd.HasGenericParameters)
             {
-                CodegenSession.LogError(errorText);
+                LogError(errorText);
                 return false;
             }
-            //Is an interface.
+            // Is an interface.
             if (objectTd.IsInterface)
             {
-                CodegenSession.LogError(errorText);
+                LogError(errorText);
                 return false;
             }
-            //Is abstract.
+            // Is abstract.
             if (objectTd.IsAbstract)
             {
-                CodegenSession.LogError(errorText);
+                LogError(errorText);
+                return false;
+            }
+            if (objectTd.InheritsFrom(Session, unityObjectType) && objectTd.IsExcluded(GeneralHelper.UNITYENGINE_ASSEMBLY_PREFIX))
+            {
+                LogError(errorText);
                 return false;
             }
 
-            //If here type is valid.
+            // If here type is valid.
             return true;
         }
-
-
     }
-
-
 }

@@ -1,11 +1,11 @@
 ﻿using FishNet.Connection;
-using FishNet.Utility.Constant;
+using FishNet.Utility;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo(UtilityConstants.GENERATED_ASSEMBLY_NAME)]
+
 namespace FishNet.Managing.Scened
 {
-
     /// <summary>
     /// Data generated when unloading a scene.
     /// </summary>
@@ -15,7 +15,7 @@ namespace FishNet.Managing.Scened
         /// Clients which receive this SceneQueueData. If Networked, all clients do. If Connections, only the specified Connections do.
         /// </summary>
         [System.NonSerialized]
-        public readonly SceneScopeTypes ScopeType;
+        public readonly SceneScopeType ScopeType;
         /// <summary>
         /// Connections to unload scenes for. Only valid on the server and when ScopeType is Connections.
         /// </summary>
@@ -34,9 +34,9 @@ namespace FishNet.Managing.Scened
         /// </summary>
         [System.NonSerialized]
         public readonly bool AsServer;
+        public UnloadQueueData() { }
 
-        internal UnloadQueueData() { }
-        internal UnloadQueueData(SceneScopeTypes scopeType, NetworkConnection[] conns, SceneUnloadData sceneUnloadData, string[] globalScenes, bool asServer)
+        internal UnloadQueueData(SceneScopeType scopeType, NetworkConnection[] conns, SceneUnloadData sceneUnloadData, string[] globalScenes, bool asServer)
         {
             ScopeType = scopeType;
             Connections = conns;
@@ -44,10 +44,5 @@ namespace FishNet.Managing.Scened
             GlobalScenes = globalScenes;
             AsServer = asServer;
         }
-
-
     }
-
-
-
 }
