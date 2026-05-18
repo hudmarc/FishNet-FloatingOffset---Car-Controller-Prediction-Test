@@ -1,6 +1,6 @@
 # FishNet+Floating Offset Client Side Predicted Car Controller + Floating Offset Demo
 
-This is my attempt at trying to adapt an existing CSP car controller to use my floating offset package.
+This is my attempt at trying to adapt an existing CSP car controller to use my [floating offset](https://github.com/hudmarc/FloatingOffset) package.
 
 https://github.com/user-attachments/assets/2a9bc9ae-5974-4382-97b6-190bbaac3f85
 
