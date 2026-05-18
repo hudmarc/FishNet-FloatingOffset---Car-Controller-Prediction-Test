@@ -3,10 +3,9 @@
 This is my attempt at trying to adapt an existing CSP car controller to use my floating offset package.
 
 ## Known issues
-- Jitter on clients (I'm not sure if this is due to the custom update loop or if it is caused by the existing CSP code)
+- ~~Jitter on clients~~ Mostly fixed, seemed to be caused by running the physics loop on PostTick instead of Tick
 - No camera smoothing
-- Desync on clients on first scene transfer/rebase (I think this is a problem with the CSP?)
-- The CSP code on the car is sus, I partially vibe-coded the upgrade to the latest prediction so I'm sure that part of the code is subpar. I want to rewrite it myself, but I'm not clear on how exactly the new prediction works and it seems like it is still not fully implemented?
+- ~~Desync on clients on scene transfer/rebase~~ To fix this use OffsetRigidbody and OffstWheels on the root of your vehicles.
 - Cinemachine does not work with FloatingOffset, I'm investigating what I could do to fix this
 
 ## How to install

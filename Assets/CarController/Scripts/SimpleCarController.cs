@@ -2,6 +2,7 @@
 using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Transporting; // UPDATE: Required for Channel enum
+using FloatingOffset.Runtime;
 using UnityEngine;
 
 enum SpeedType
@@ -31,6 +32,8 @@ public class SimpleCarController : NetworkBehaviour
     [SerializeField] private WheelCollider[] wheelColliders = new WheelCollider[4];
     [SerializeField] private Transform[] wheelMeshes = new Transform[4];
     [SerializeField] private Camera cam;
+    [SerializeField] private OffsetUniverse universe;
+    private OffsetTransform offsetTransform;
 
     #region Types.
 
@@ -57,7 +60,9 @@ public class SimpleCarController : NetworkBehaviour
     // UPDATE: Structs must now implement IReconcileData
     public struct ReconcileData : IReconcileData
     {
-        public Vector3 Position;
+        public double PositionX;
+        public double PositionY;
+        public double PositionZ;
         public Quaternion Rotation;
         public Vector3 Velocity;
         public Vector3 AngularVelocity;
@@ -79,13 +84,15 @@ public class SimpleCarController : NetworkBehaviour
         public uint GetTick() => _tick;
         public void SetTick(uint value) => _tick = value;
 
-        public ReconcileData(Vector3 position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear,
+        public ReconcileData(Vector3d position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear,
                float frontLeftSteerAngle, float frontRightSteerAngle,
                float frontLeftMotorTorque, float frontRightMotorTorque,
                float frontLeftBrakeTorque, float frontRightBrakeTorque,
                float backLeftBrakeTorque, float backRightBrakeTorque) : this() // UPDATE: Struct constructors require ': this()'
         {
-            Position = position;
+            PositionX = position.x;
+            PositionY = position.y;
+            PositionZ = position.z;
             Rotation = rotation;
             Velocity = velocity;
             AngularVelocity = angularVelocity;
@@ -120,6 +127,7 @@ public class SimpleCarController : NetworkBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        offsetTransform = GetComponent<OffsetTransform>();
         cam.enabled = false;
         // Subscriptions moved to OnStartNetwork
     }
@@ -195,26 +203,6 @@ public class SimpleCarController : NetworkBehaviour
         HandleGearChange();
         CalculateEngineRevs();
         HandleAudio();
-    }
-
-    [Reconcile]
-    // UPDATE: Method signature updated to support (replaced bool asServer with Channel).
-    private void Reconciliation(ReconcileData rd, Channel channel = Channel.Unreliable)
-    {
-        transform.position = rd.Position;
-        transform.rotation = rd.Rotation;
-        rb.velocity = rd.Velocity;
-        rb.angularVelocity = rd.AngularVelocity;
-        rotationInPreviousFrame = rd.RotationInPreviousFrame;
-        currentGear = rd.CurrentGear;
-        wheelColliders[0].steerAngle = rd.FrontLeftSteerAngle;
-        wheelColliders[1].steerAngle = rd.FrontRightSteerAngle;
-        wheelColliders[0].motorTorque = rd.FrontLeftMotorTorque;
-        wheelColliders[1].motorTorque = rd.FrontRightMotorTorque;
-        wheelColliders[0].brakeTorque = rd.FrontLeftBrakeTorque;
-        wheelColliders[1].brakeTorque = rd.FrontRightBrakeTorque;
-        wheelColliders[2].brakeTorque = rd.BackLeftBrakeTorque;
-        wheelColliders[3].brakeTorque = rd.BackRightBrakeTorque;
     }
 
     // UPDATE: Replaces CheckInput to return a struct and handle ownership checks explicitly.
@@ -454,11 +442,56 @@ public class SimpleCarController : NetworkBehaviour
     // UPDATE: Build reconcile data here and invoke your Reconcile method.
     public override void CreateReconcile()
     {
-        ReconcileData rd = new ReconcileData(transform.position, transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
+        ReconcileData rd = new ReconcileData(offsetTransform.GetRealPosition(), transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
             wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
             wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
             wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque, wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque);
 
         Reconciliation(rd);
+    }
+
+
+    [Reconcile]
+    // UPDATE: Method signature updated to support (replaced bool asServer with Channel).
+    private void Reconciliation(ReconcileData rd, Channel channel = Channel.Unreliable)
+    {
+        var position = new Vector3d(rd.PositionX, rd.PositionY, rd.PositionZ);
+
+        Vector3d difference = position - offsetTransform.GetRealPosition();
+        offsetTransform.transform.position += Mathd.toVector3(difference);
+
+
+        transform.rotation = rd.Rotation;
+        Debug.Log($"PREV: {rb.velocity.magnitude} INCOMING: {rd.Velocity.magnitude}");
+        rb.velocity = rd.Velocity;
+        rb.angularVelocity = rd.AngularVelocity;
+        rotationInPreviousFrame = rd.RotationInPreviousFrame;
+        currentGear = rd.CurrentGear;
+        wheelColliders[0].steerAngle = rd.FrontLeftSteerAngle;
+        wheelColliders[1].steerAngle = rd.FrontRightSteerAngle;
+        wheelColliders[0].motorTorque = rd.FrontLeftMotorTorque;
+        wheelColliders[1].motorTorque = rd.FrontRightMotorTorque;
+        wheelColliders[0].brakeTorque = rd.FrontLeftBrakeTorque;
+        wheelColliders[1].brakeTorque = rd.FrontRightBrakeTorque;
+        wheelColliders[2].brakeTorque = rd.BackLeftBrakeTorque;
+        wheelColliders[3].brakeTorque = rd.BackRightBrakeTorque;
+
+        bool was_offset = difference.magnitude > 0.1;
+
+        float targetStiffness = was_offset ? 0f : 1f;
+
+        // Temporarily disable wheel stiffness to prevent bugs from scene changing
+        for (int i = 0; i < wheelColliders.Length; i++)
+        {
+            // Extract, modify, and reassign Forward Friction
+            WheelFrictionCurve fFriction = wheelColliders[i].forwardFriction;
+            fFriction.stiffness = targetStiffness;
+            wheelColliders[i].forwardFriction = fFriction;
+
+            // Extract, modify, and reassign Sideways Friction
+            WheelFrictionCurve sFriction = wheelColliders[i].sidewaysFriction;
+            sFriction.stiffness = targetStiffness;
+            wheelColliders[i].sidewaysFriction = sFriction;
+        }
     }
 }

@@ -1354,6 +1354,8 @@ GameObject:
   - component: {fileID: 6397051676162244328}
   - component: {fileID: 4949735607369871373}
   - component: {fileID: 3026152992423053119}
+  - component: {fileID: 6706964128552727902}
+  - component: {fileID: 4423272311051515610}
   m_Layer: 0
   m_Name: TocusCar
   m_TagString: Untagged
@@ -1469,6 +1471,7 @@ MonoBehaviour:
   - {fileID: 4252074655309166}
   - {fileID: 4944351361650126}
   cam: {fileID: 7225948199783267923}
+  universe: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
 --- !u!82 &8664749433092530337
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1585,7 +1588,6 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 8760957851015742001}
-  - {fileID: 0}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -1596,7 +1598,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584226294576613578
+  _initializedTimestamp: -8584225394842135768
   _localLevelOfDetailCalculationType: 0
   _useLevelOfDetail: 0
   _useRootLevelOfDetail: 1
@@ -1615,9 +1617,9 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 1
+  <PrefabId>k__BackingField: 3
   <SpawnableCollectionId>k__BackingField: 0
-  <AssetPathHash>k__BackingField: 12336802286048717208
+  <AssetPathHash>k__BackingField: 6129832932404399396
   SceneId: 0
   SerializedTransformProperties:
     Position: {x: 0, y: 1, z: 0}
@@ -1654,6 +1656,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   <universe>k__BackingField: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
   <isView>k__BackingField: 1
+--- !u!114 &6706964128552727902
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1610265466720824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da21d290f0d164132b0b485cb5f34657, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &4423272311051515610
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1610265466720824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96b2441623b0746f4b32cb37c6922695, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1672185482629448
 GameObject:
   m_ObjectHideFlags: 0
