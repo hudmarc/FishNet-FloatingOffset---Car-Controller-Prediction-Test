@@ -1,4 +1,4 @@
-﻿using Cinemachine;
+using Cinemachine;
 using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Transporting; // UPDATE: Required for Channel enum
@@ -462,7 +462,7 @@ public class SimpleCarController : NetworkBehaviour
 
 
         transform.rotation = rd.Rotation;
-        Debug.Log($"PREV: {rb.velocity.magnitude} INCOMING: {rd.Velocity.magnitude}");
+        // Debug.Log($"PREV: {rb.velocity.magnitude} INCOMING: {rd.Velocity.magnitude}");
         rb.velocity = rd.Velocity;
         rb.angularVelocity = rd.AngularVelocity;
         rotationInPreviousFrame = rd.RotationInPreviousFrame;
