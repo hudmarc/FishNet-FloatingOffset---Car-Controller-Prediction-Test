@@ -34,16 +34,7 @@ To change offset settings etc look at `DefaultOffsetUniverse` and change the set
 
 To add a new tracked entity simply add an `OffsetTransform` and set `isView` to `True`
 
-
-
-
 https://github.com/user-attachments/assets/92f08723-80dd-4d44-baaa-3fd25da893e1
-
-https://github.com/user-attachments/assets/b98324eb-2825-4b8f-8f15-97acf8e4f958
-
-
-
-
 
 ---
 #### Free assets used
