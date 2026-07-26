@@ -13,7 +13,6 @@ GameObject:
   - component: {fileID: 1624797600445267753}
   - component: {fileID: 1624797600445267755}
   - component: {fileID: -8863191297888188799}
-  - component: {fileID: -8748145632212526017}
   - component: {fileID: -7415538801199885152}
   m_Layer: 0
   m_Name: CubePrefab
@@ -159,20 +158,6 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 1624797600445267755}
   _networkObjectCache: {fileID: 1624797600445267755}
---- !u!114 &-8748145632212526017
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1624797600445267749}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e597e6ff32c684de6b4ae0a426244f7d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  <universe>k__BackingField: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
-  <isView>k__BackingField: 0
 --- !u!114 &-7415538801199885152
 MonoBehaviour:
   m_ObjectHideFlags: 0

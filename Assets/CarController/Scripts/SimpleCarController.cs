@@ -1,4 +1,4 @@
-using Cinemachine;
+﻿using Cinemachine;
 using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Transporting; // UPDATE: Required for Channel enum
@@ -33,7 +33,7 @@ public class SimpleCarController : NetworkBehaviour
     [SerializeField] private Transform[] wheelMeshes = new Transform[4];
     [SerializeField] private Camera cam;
     [SerializeField] private OffsetUniverse universe;
-    private OffsetTransform offsetTransform;
+    private OffsetTransform view;
 
     #region Types.
 
@@ -127,7 +127,7 @@ public class SimpleCarController : NetworkBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        offsetTransform = GetComponent<OffsetTransform>();
+        view = GetComponent<OffsetTransform>();
         cam.enabled = false;
         // Subscriptions moved to OnStartNetwork
     }
@@ -442,7 +442,7 @@ public class SimpleCarController : NetworkBehaviour
     // UPDATE: Build reconcile data here and invoke your Reconcile method.
     public override void CreateReconcile()
     {
-        ReconcileData rd = new ReconcileData(offsetTransform.GetRealPosition(), transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
+        ReconcileData rd = new ReconcileData(view.GetRealPosition(), transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
             wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
             wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
             wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque, wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque);
@@ -457,8 +457,8 @@ public class SimpleCarController : NetworkBehaviour
     {
         var position = new Vector3d(rd.PositionX, rd.PositionY, rd.PositionZ);
 
-        Vector3d difference = position - offsetTransform.GetRealPosition();
-        offsetTransform.transform.position += Mathd.toVector3(difference);
+        Vector3d difference = position - view.GetRealPosition();
+        view.transform.position += Mathd.toVector3(difference);
 
 
         transform.rotation = rd.Rotation;
