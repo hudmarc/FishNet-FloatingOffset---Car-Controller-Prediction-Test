@@ -7,7 +7,7 @@ https://github.com/user-attachments/assets/2a9bc9ae-5974-4382-97b6-190bbaac3f85
 ## Known issues
 - ~~Jitter on clients~~ Mostly fixed, seemed to be caused by running the physics loop on PostTick instead of Tick
 - No camera smoothing
-- ~~Desync on clients on scene transfer/rebase~~ To fix this use OffsetRigidbody and OffstWheels on the root of your vehicles.
+- ~~Desync on clients on scene transfer/rebase~~ To fix this use OffsetRigidbody and OffsetWheels on the root of your vehicles.
 - Cinemachine does not work with FloatingOffset, I'm investigating what I could do to fix this
 
 ## How to install
