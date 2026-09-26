@@ -1,5 +1,7 @@
 # FishNet+Floating Offset Client Side Predicted Car Controller + Floating Offset Demo
 
+`Built for Floating Offset 0.3`
+
 This is my attempt at trying to adapt [an existing CSP car controller](https://github.com/Roceh/FishNet---Car-Controller-Prediction-Test) to use my [floating offset](https://github.com/hudmarc/FloatingOffset) package.
 
 https://github.com/user-attachments/assets/2a9bc9ae-5974-4382-97b6-190bbaac3f85
