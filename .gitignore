@@ -1,3 +1,18 @@
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+/Assets/FishNet*
+
+VelocityGrapher.cs*
+
+DebugGUI*
+Packages*
+
 # This .gitignore file should be placed at the root of your Unity project directory
 #
 # Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore
@@ -46,6 +61,7 @@ ExportedObj/
 *.mdb
 *.opendb
 *.VC.db
+.vscode
 
 # Unity3D generated meta files
 *.pidb.meta
@@ -58,7 +74,6 @@ sysinfo.txt
 # Builds
 *.apk
 *.aab
-*.unitypackage
 *.app
 
 # Crashlytics generated file
@@ -71,12 +86,19 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
-# other assets
-/[Aa]ssets/[Pp]arrelSync/
-/[Aa]ssets/[Pp]arrelSync.meta
+# MacOS System Files from https://github.com/github/gitignore/blob/main/Global/macOS.gitignore
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
 
-# MacOS
-.DS*
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 
-# FishNet
-/Assets/FishNet
+# Solution artifacts
+.build
+Runtime/Core/obj

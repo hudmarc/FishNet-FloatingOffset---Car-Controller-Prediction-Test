@@ -1,9 +1,10 @@
-﻿using Cinemachine;
+﻿
 using FishNet.Object;
 using FishNet.Object.Prediction;
-using FishNet.Transporting; // UPDATE: Required for Channel enum
+using FishNet.Transporting;
 using FloatingOffset.Runtime;
 using UnityEngine;
+using FishNet.Connection;
 
 enum SpeedType
 {
@@ -33,7 +34,7 @@ public class SimpleCarController : NetworkBehaviour
     [SerializeField] private Transform[] wheelMeshes = new Transform[4];
     [SerializeField] private Camera cam;
     [SerializeField] private OffsetUniverse universe;
-    private OffsetTransform view;
+    private OffsetView view;
 
     #region Types.
 
@@ -63,6 +64,7 @@ public class SimpleCarController : NetworkBehaviour
         public double PositionX;
         public double PositionY;
         public double PositionZ;
+        public double OffsetX, OffsetY, OffsetZ;
         public Quaternion Rotation;
         public Vector3 Velocity;
         public Vector3 AngularVelocity;
@@ -84,7 +86,7 @@ public class SimpleCarController : NetworkBehaviour
         public uint GetTick() => _tick;
         public void SetTick(uint value) => _tick = value;
 
-        public ReconcileData(Vector3d position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear,
+        public ReconcileData(Vector3d position, Vector3d offset, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear,
                float frontLeftSteerAngle, float frontRightSteerAngle,
                float frontLeftMotorTorque, float frontRightMotorTorque,
                float frontLeftBrakeTorque, float frontRightBrakeTorque,
@@ -93,6 +95,9 @@ public class SimpleCarController : NetworkBehaviour
             PositionX = position.x;
             PositionY = position.y;
             PositionZ = position.z;
+            OffsetX = offset.x;
+            OffsetY = offset.y;
+            OffsetZ = offset.z;
             Rotation = rotation;
             Velocity = velocity;
             AngularVelocity = angularVelocity;
@@ -127,12 +132,10 @@ public class SimpleCarController : NetworkBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        view = GetComponent<OffsetTransform>();
+        view = GetComponent<OffsetView>();
         cam.enabled = false;
-        // Subscriptions moved to OnStartNetwork
     }
 
-    // UPDATE: Use OnStartNetwork/OnStopNetwork to ensure TimeManager is correctly referenced
     public override void OnStartNetwork()
     {
         base.OnStartNetwork();
@@ -141,6 +144,7 @@ public class SimpleCarController : NetworkBehaviour
             base.TimeManager.OnTick += TimeManager_OnTick;
             base.TimeManager.OnPostTick += TimeManager_OnPostTick;
         }
+        gameObject.name += $"Id ({base.OwnerId})";
     }
 
     public override void OnStopNetwork()
@@ -160,6 +164,7 @@ public class SimpleCarController : NetworkBehaviour
         if (base.IsOwner)
         {
             cam.enabled = true;
+
         }
         else
         {
@@ -169,43 +174,56 @@ public class SimpleCarController : NetworkBehaviour
         Cursor.lockState = CursorLockMode.Locked;
     }
 
+    public override void OnSpawnServer(NetworkConnection connection)
+    {
+        base.OnSpawnServer(connection);
+
+        ReconcileData rd = new ReconcileData(
+            view.GetRealPosition(),
+            universe.manager.GetLocalOffset(view),
+            transform.rotation,
+            rb.velocity,
+            rb.angularVelocity,
+            rotationInPreviousFrame,
+            currentGear,
+            wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
+            wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
+            wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque,
+            wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque
+        );
+
+        TargetSyncInitialState(connection, rd);
+    }
+
+    [TargetRpc]
+    private void TargetSyncInitialState(NetworkConnection connection, ReconcileData rd)
+    {
+        // Send initial state
+        Reconciliation(rd);
+    }
+
     private void TimeManager_OnTick()
     {
-        // UPDATE: Prediction manages IsServer, IsOwner checks, and automatic replays natively.
-        // You just need to pass the data into your replicate method.
-        Move(BuildMoveData());
-        HandleWheelTransform();
+        if (base.IsOwner)
+        {
+            Move(BuildMoveData());
+        }
+        else if (base.IsServerInitialized)
+        {
+            Move(default);
+        }
 
+        HandleWheelTransform();
     }
 
     private void TimeManager_OnPostTick()
     {
-        // UPDATE: Call CreateReconcile on every post-tick. The framework handles whether it needs to be sent or not.
-        CreateReconcile();
-
+        if (base.IsServerInitialized)
+        {
+            CreateReconcile();
+        }
     }
 
-    [Replicate]
-    // UPDATE: Method signature updated to support (replaced bools with ReplicateState and Channel).
-    private void Move(MoveData md, ReplicateState state = ReplicateState.Invalid, Channel channel = Channel.Unreliable)
-    {
-        horizontalInput = md.Horizontal;
-        verticalInput = md.Vertical;
-
-        UpdateCurrentSpeed();
-        HandleSteering();
-        HandleDrive();
-
-        AntiRoll();
-        DetectReverse();
-        TractionControl();
-        SteeringAssist();
-        HandleGearChange();
-        CalculateEngineRevs();
-        HandleAudio();
-    }
-
-    // UPDATE: Replaces CheckInput to return a struct and handle ownership checks explicitly.
     private MoveData BuildMoveData()
     {
         if (!base.IsOwner)
@@ -442,7 +460,7 @@ public class SimpleCarController : NetworkBehaviour
     // UPDATE: Build reconcile data here and invoke your Reconcile method.
     public override void CreateReconcile()
     {
-        ReconcileData rd = new ReconcileData(view.GetRealPosition(), transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
+        ReconcileData rd = new ReconcileData(view.GetRealPosition(), universe.manager.GetLocalOffset(view), transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
             wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
             wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
             wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque, wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque);
@@ -450,23 +468,42 @@ public class SimpleCarController : NetworkBehaviour
         Reconciliation(rd);
     }
 
+    [Replicate]
+    private void Move(MoveData md, ReplicateState state = ReplicateState.Invalid, Channel channel = Channel.Unreliable)
+    {
+        horizontalInput = md.Horizontal;
+        verticalInput = md.Vertical;
+
+        UpdateCurrentSpeed();
+        HandleSteering();
+        HandleDrive();
+
+        AntiRoll();
+        DetectReverse();
+        TractionControl();
+        SteeringAssist();
+        HandleGearChange();
+        CalculateEngineRevs();
+        HandleAudio();
+    }
 
     [Reconcile]
-    // UPDATE: Method signature updated to support (replaced bool asServer with Channel).
     private void Reconciliation(ReconcileData rd, Channel channel = Channel.Unreliable)
     {
         var position = new Vector3d(rd.PositionX, rd.PositionY, rd.PositionZ);
+        var offset = new Vector3d(rd.OffsetX, rd.OffsetY, rd.OffsetZ); //latest offset
+        var local_pos = position - universe.manager.GetLocalOffset(view);
 
-        Vector3d difference = position - view.GetRealPosition();
-        view.transform.position += Mathd.toVector3(difference);
+        var error = offset - universe.manager.GetLocalOffset(view);
 
+        rb.position = new Vector3((float)local_pos.x, (float)local_pos.y, (float)local_pos.z);
 
         transform.rotation = rd.Rotation;
-        // Debug.Log($"PREV: {rb.velocity.magnitude} INCOMING: {rd.Velocity.magnitude}");
         rb.velocity = rd.Velocity;
         rb.angularVelocity = rd.AngularVelocity;
         rotationInPreviousFrame = rd.RotationInPreviousFrame;
         currentGear = rd.CurrentGear;
+
         wheelColliders[0].steerAngle = rd.FrontLeftSteerAngle;
         wheelColliders[1].steerAngle = rd.FrontRightSteerAngle;
         wheelColliders[0].motorTorque = rd.FrontLeftMotorTorque;
@@ -475,23 +512,5 @@ public class SimpleCarController : NetworkBehaviour
         wheelColliders[1].brakeTorque = rd.FrontRightBrakeTorque;
         wheelColliders[2].brakeTorque = rd.BackLeftBrakeTorque;
         wheelColliders[3].brakeTorque = rd.BackRightBrakeTorque;
-
-        bool was_offset = difference.magnitude > 0.1;
-
-        float targetStiffness = was_offset ? 0f : 1f;
-
-        // Temporarily disable wheel stiffness to prevent bugs from scene changing
-        for (int i = 0; i < wheelColliders.Length; i++)
-        {
-            // Extract, modify, and reassign Forward Friction
-            WheelFrictionCurve fFriction = wheelColliders[i].forwardFriction;
-            fFriction.stiffness = targetStiffness;
-            wheelColliders[i].forwardFriction = fFriction;
-
-            // Extract, modify, and reassign Sideways Friction
-            WheelFrictionCurve sFriction = wheelColliders[i].sidewaysFriction;
-            sFriction.stiffness = targetStiffness;
-            wheelColliders[i].sidewaysFriction = sFriction;
-        }
     }
 }

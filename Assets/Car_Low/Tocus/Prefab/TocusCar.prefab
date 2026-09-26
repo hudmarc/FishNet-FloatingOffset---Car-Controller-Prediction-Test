@@ -1354,8 +1354,8 @@ GameObject:
   - component: {fileID: 6397051676162244328}
   - component: {fileID: 4949735607369871373}
   - component: {fileID: 3026152992423053119}
-  - component: {fileID: 6706964128552727902}
-  - component: {fileID: 4423272311051515610}
+  - component: {fileID: 1690279350761804573}
+  - component: {fileID: 3405384698918056248}
   m_Layer: 0
   m_Name: TocusCar
   m_TagString: Untagged
@@ -1587,7 +1587,7 @@ MonoBehaviour:
   <PredictedSpawn>k__BackingField: {fileID: 0}
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
-  - {fileID: 0}
+  - {fileID: 8760957851015742001}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -1598,7 +1598,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584225394842135768
+  _initializedTimestamp: -8584111469541538848
   _localLevelOfDetailCalculationType: 0
   _useLevelOfDetail: 0
   _useRootLevelOfDetail: 1
@@ -1655,8 +1655,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   <universe>k__BackingField: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
-  <isView>k__BackingField: 1
---- !u!114 &6706964128552727902
+--- !u!114 &1690279350761804573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1610265466720824}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c5830ae6186b489eaa1e5e3d75310cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &3405384698918056248
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1668,18 +1679,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da21d290f0d164132b0b485cb5f34657, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &4423272311051515610
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1610265466720824}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 96b2441623b0746f4b32cb37c6922695, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  <universe>k__BackingField: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
 --- !u!1 &1672185482629448
 GameObject:
   m_ObjectHideFlags: 0

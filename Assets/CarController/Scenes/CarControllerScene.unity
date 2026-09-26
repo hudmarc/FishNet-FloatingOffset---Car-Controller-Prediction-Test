@@ -1021,6 +1021,14 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: -52.69995
       objectReference: {fileID: 0}
+    - target: {fileID: 3414662637742749596, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 78.1001
+      objectReference: {fileID: 0}
+    - target: {fileID: 3414662637742749596, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -121.399994
+      objectReference: {fileID: 0}
     - target: {fileID: 4393252310584637056, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
       propertyPath: AutoStart
       value: 1
@@ -1188,7 +1196,7 @@ MonoBehaviour:
   _maximumFrameTicks: 3
   _tickRate: 120
   _pingInterval: 1
-  _physicsMode: 2
+  _physicsMode: 1
 --- !u!114 &329493277
 MonoBehaviour:
   m_ObjectHideFlags: 0
