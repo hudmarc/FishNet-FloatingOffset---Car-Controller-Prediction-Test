@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using FishNet.Object;
 using UnityEngine;
 
@@ -7,8 +5,9 @@ public class CameraDestroyer : NetworkBehaviour
 {
     [SerializeField]
     private Camera cam;
-    void Start()
+    void Awake()
     {
+        DestroyImmediate(cam.GetComponent<AudioListener>());
         cam.enabled = false;
     }
     // Start is called before the first frame update
@@ -16,11 +15,10 @@ public class CameraDestroyer : NetworkBehaviour
     {
         base.OnStartClient();
 
-        Debug.Log("Start Client");
         if (base.IsOwner)
         {
-            Debug.Log("Is owner");
             cam.enabled = true;
+            cam.gameObject.AddComponent<AudioListener>();
         }
     }
 }

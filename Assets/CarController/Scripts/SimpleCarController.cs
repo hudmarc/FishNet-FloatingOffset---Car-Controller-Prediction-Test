@@ -33,7 +33,6 @@ public class SimpleCarController : NetworkBehaviour
     [SerializeField] private WheelCollider[] wheelColliders = new WheelCollider[4];
     [SerializeField] private Transform[] wheelMeshes = new Transform[4];
     [SerializeField] private Camera cam;
-    [SerializeField] private OffsetUniverse universe;
     private OffsetView view;
 
     #region Types.
@@ -119,6 +118,8 @@ public class SimpleCarController : NetworkBehaviour
     #endregion
 
     private Rigidbody rb;
+    private float current_horizontal;
+    private float current_vertical;
     private float horizontalInput;
     private float verticalInput;
     private bool isReversing = false;
@@ -136,6 +137,17 @@ public class SimpleCarController : NetworkBehaviour
         cam.enabled = false;
     }
 
+    private void Update()
+    {
+        // Update visual wheel positions once per render frame
+        HandleWheelTransform();
+
+        // Update audio engine pitch once per render frame
+        CalculateEngineRevs();
+        HandleAudio();
+        current_horizontal = Input.GetAxis("Horizontal");
+        current_vertical = Input.GetAxis("Vertical");
+    }
     public override void OnStartNetwork()
     {
         base.OnStartNetwork();
@@ -179,8 +191,8 @@ public class SimpleCarController : NetworkBehaviour
         base.OnSpawnServer(connection);
 
         ReconcileData rd = new ReconcileData(
-            view.GetRealPosition(),
-            universe.manager.GetLocalOffset(view),
+            OffsetUtils.GetRealPosition(view.transform),
+            OffsetBehaviour.manager.GetLocalOffset(gameObject.scene),
             transform.rotation,
             rb.velocity,
             rb.angularVelocity,
@@ -212,8 +224,6 @@ public class SimpleCarController : NetworkBehaviour
         {
             Move(default);
         }
-
-        HandleWheelTransform();
     }
 
     private void TimeManager_OnPostTick()
@@ -229,10 +239,9 @@ public class SimpleCarController : NetworkBehaviour
         if (!base.IsOwner)
             return default;
 
-        var horizontal = Input.GetAxis("Horizontal");
-        var vertical = Input.GetAxis("Vertical");
 
-        return new MoveData(horizontal, vertical);
+
+        return new MoveData(current_horizontal, current_vertical);
     }
 
     private void Start()
@@ -306,7 +315,7 @@ public class SimpleCarController : NetworkBehaviour
         }
     }
 
-    private void AntiRoll()
+    private void AntiRollForce()
     {
         // Front axle
         ApplyAntiRoll(wheelColliders[0], wheelColliders[1]);
@@ -460,7 +469,7 @@ public class SimpleCarController : NetworkBehaviour
     // UPDATE: Build reconcile data here and invoke your Reconcile method.
     public override void CreateReconcile()
     {
-        ReconcileData rd = new ReconcileData(view.GetRealPosition(), universe.manager.GetLocalOffset(view), transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
+        ReconcileData rd = new ReconcileData(OffsetUtils.GetRealPosition(view.transform), OffsetBehaviour.manager.GetLocalOffset(gameObject.scene), transform.rotation, rb.velocity, rb.angularVelocity, rotationInPreviousFrame, currentGear,
             wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
             wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
             wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque, wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque);
@@ -478,13 +487,11 @@ public class SimpleCarController : NetworkBehaviour
         HandleSteering();
         HandleDrive();
 
-        AntiRoll();
+        AntiRollForce();
         DetectReverse();
         TractionControl();
         SteeringAssist();
         HandleGearChange();
-        CalculateEngineRevs();
-        HandleAudio();
     }
 
     [Reconcile]
@@ -492,9 +499,9 @@ public class SimpleCarController : NetworkBehaviour
     {
         var position = new Vector3d(rd.PositionX, rd.PositionY, rd.PositionZ);
         var offset = new Vector3d(rd.OffsetX, rd.OffsetY, rd.OffsetZ); //latest offset
-        var local_pos = position - universe.manager.GetLocalOffset(view);
+        var local_pos = position - OffsetBehaviour.manager.GetLocalOffset(gameObject.scene);
 
-        var error = offset - universe.manager.GetLocalOffset(view);
+        var error = offset - OffsetBehaviour.manager.GetLocalOffset(gameObject.scene);
 
         rb.position = new Vector3((float)local_pos.x, (float)local_pos.y, (float)local_pos.z);
 

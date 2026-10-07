@@ -1356,6 +1356,8 @@ GameObject:
   - component: {fileID: 3026152992423053119}
   - component: {fileID: 1690279350761804573}
   - component: {fileID: 3405384698918056248}
+  - component: {fileID: 8821493614578939178}
+  - component: {fileID: 4235598290778751028}
   m_Layer: 0
   m_Name: TocusCar
   m_TagString: Untagged
@@ -1471,7 +1473,6 @@ MonoBehaviour:
   - {fileID: 4252074655309166}
   - {fileID: 4944351361650126}
   cam: {fileID: 7225948199783267923}
-  universe: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
 --- !u!82 &8664749433092530337
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1588,6 +1589,7 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 8760957851015742001}
+  - {fileID: 8821493614578939178}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -1598,7 +1600,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584111469541538848
+  _initializedTimestamp: -8584102331719083198
   _localLevelOfDetailCalculationType: 0
   _useLevelOfDetail: 0
   _useRootLevelOfDetail: 1
@@ -1617,7 +1619,7 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 3
+  <PrefabId>k__BackingField: 4
   <SpawnableCollectionId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 6129832932404399396
   SceneId: 0
@@ -1654,7 +1656,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e597e6ff32c684de6b4ae0a426244f7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  <universe>k__BackingField: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
+  IsPlayer: 1
 --- !u!114 &1690279350761804573
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1679,7 +1681,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da21d290f0d164132b0b485cb5f34657, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  <universe>k__BackingField: {fileID: 11400000, guid: 80d94916e13ab4ecb8503bb939768d71, type: 2}
+--- !u!114 &8821493614578939178
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1610265466720824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 265373fd371da467c9e2fb22ad8400f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 6397051676162244328}
+  _networkObjectCache: {fileID: 6397051676162244328}
+  cam: {fileID: 7225948199783267923}
+--- !u!114 &4235598290778751028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1610265466720824}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54d6c6ba9c3dd44e8b5ebae97b15d41b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerRb: {fileID: 0}
 --- !u!1 &1672185482629448
 GameObject:
   m_ObjectHideFlags: 0
