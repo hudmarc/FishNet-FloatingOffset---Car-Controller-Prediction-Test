@@ -5,34 +5,49 @@ using FloatingOffset.Runtime;
 using UnityEngine;
 using FishNet.Connection;
 
-enum SpeedType
+/// <summary>
+/// A simple AI NPC car controller that was AI-generated with Gemini 3.6-Flash for this techdemo.
+/// Not thoroughly tested. No guarantees of proper function. Use at your own risk.
+/// </summary>
+public class VibeCodedAICarController : NetworkBehaviour
 {
-    KPH,
-    MPH
-}
+    private enum AiState
+    {
+        Chasing,
+        UnstuckReversing,
+        UnstuckForward
+    }
 
-public class SimpleCarController : NetworkBehaviour
-{
+    [Header("AI Settings")]
+    [SerializeField] private float targetSearchInterval = 0.2f;
+    [SerializeField] private float reverseDistanceThreshold = 3f;
+
+    [Header("Unstuck Settings")]
+    [SerializeField] private float stuckSpeedThreshold = 0.5f; // Speed below which car is considered stationary (m/s)
+    [SerializeField] private float stuckTimeThreshold = 2.0f;  // Seconds stationary before trigger
+    [SerializeField] private float unstuckReverseDuration = 1.5f; // Seconds spent reversing & turning ~60 deg
+    [SerializeField] private float unstuckForwardDuration = 2.0f; // Seconds spent driving forward out of obstacle
+
+    [Header("Car Settings")]
     [SerializeField] private GameObject visual;
-    [SerializeField] private float maxSteerAngle;
-    [SerializeField] private float motorForce;
-    [SerializeField] private float brakeForce;
-    [SerializeField] private float topSpeed;
+    [SerializeField] private float maxSteerAngle = 30f;
+    [SerializeField] private float motorForce = 1500f;
+    [SerializeField] private float brakeForce = 3000f;
+    [SerializeField] private float topSpeed = 150f;
     [SerializeField] private SpeedType speedType;
     [SerializeField] private float antiRoll = 1000f;
     [SerializeField] private bool tractionControl = true;
     [SerializeField] private float slipLimit = 0.3f;
     [SerializeField] private bool steeringAssist = true;
     [SerializeField] private float steeringAssistRatio = 0.5f;
-    [SerializeField] private int numberOfGears;
+    [SerializeField] private int numberOfGears = 5;
     [SerializeField] private AudioSource audioSource;
-    [SerializeField] private float minimumPitch;
-    [SerializeField] private float maximumPitch;
-    [SerializeField] private float boostZoneMultiplier;
+    [SerializeField] private float minimumPitch = 0.5f;
+    [SerializeField] private float maximumPitch = 2.0f;
+    [SerializeField] private float boostZoneMultiplier = 1.5f;
     [SerializeField] private WheelCollider[] wheelColliders = new WheelCollider[4];
     [SerializeField] private Transform[] wheelMeshes = new Transform[4];
-    [SerializeField] private Camera cam;
-    [SerializeField] private float lookBackOffset = 10;
+
     private OffsetView view;
 
     #region Types
@@ -65,13 +80,26 @@ public class SimpleCarController : NetworkBehaviour
         public Vector3 AngularVelocity;
         public float RotationInPreviousFrame;
         public int CurrentGear;
+        public float FrontLeftSteerAngle;
+        public float FrontRightSteerAngle;
+        public float FrontLeftMotorTorque;
+        public float FrontRightMotorTorque;
+
+        public float FrontLeftBrakeTorque;
+        public float FrontRightBrakeTorque;
+        public float BackLeftBrakeTorque;
+        public float BackRightBrakeTorque;
 
         private uint _tick;
         public void Dispose() { }
         public uint GetTick() => _tick;
         public void SetTick(uint value) => _tick = value;
 
-        public ReconcileData(Vector3d position, Vector3d offset, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear) : this()
+        public ReconcileData(Vector3d position, Vector3d offset, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear,
+               float frontLeftSteerAngle, float frontRightSteerAngle,
+               float frontLeftMotorTorque, float frontRightMotorTorque,
+               float frontLeftBrakeTorque, float frontRightBrakeTorque,
+               float backLeftBrakeTorque, float backRightBrakeTorque) : this()
         {
             PositionX = position.x;
             PositionY = position.y;
@@ -84,15 +112,22 @@ public class SimpleCarController : NetworkBehaviour
             AngularVelocity = angularVelocity;
             RotationInPreviousFrame = rotationInPreviousFrame;
             CurrentGear = currentGear;
+
+            FrontLeftSteerAngle = frontLeftSteerAngle;
+            FrontRightSteerAngle = frontRightSteerAngle;
+            FrontLeftMotorTorque = frontLeftMotorTorque;
+            FrontRightMotorTorque = frontRightMotorTorque;
+
+            FrontLeftBrakeTorque = frontLeftBrakeTorque;
+            FrontRightBrakeTorque = frontRightBrakeTorque;
+            BackLeftBrakeTorque = backLeftBrakeTorque;
+            BackRightBrakeTorque = backRightBrakeTorque;
         }
     }
 
     #endregion
 
     private Rigidbody rb;
-    private float current_horizontal;
-    private float current_vertical;
-    private bool look_back = false;
     private float horizontalInput;
     private float verticalInput;
     private bool isReversing = false;
@@ -103,20 +138,18 @@ public class SimpleCarController : NetworkBehaviour
     private float engineRpm;
     private float motorForceWithoutBoost;
 
-    private Vector3 cam_initial_pos;
-    private Vector3 cam_lookback_pos;
-    private Quaternion cam_initial;
-    private Quaternion cam_inverted;
+    // AI Tracking & State Variables
+    private Transform targetPlayer;
+    private float searchTimer;
+    private AiState currentState = AiState.Chasing;
+    private float stuckTimer = 0f;
+    private float stateTimer = 0f;
+    private float unstuckSteerDirection = 1f;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
         view = GetComponent<OffsetView>();
-        cam.enabled = false;
-        cam_initial = cam.transform.localRotation;
-        cam_inverted = cam_initial * Quaternion.AngleAxis(180, Vector3.up);
-        cam_initial_pos = cam.transform.localPosition;
-        cam_lookback_pos = cam_initial_pos + Vector3.forward * lookBackOffset;
     }
 
     private void Start()
@@ -129,16 +162,6 @@ public class SimpleCarController : NetworkBehaviour
         HandleWheelTransform();
         CalculateEngineRevs();
         HandleAudio();
-
-        current_horizontal = Input.GetAxis("Horizontal");
-        current_vertical = Input.GetAxis("Vertical");
-
-        if (look_back != Input.GetKey(KeyCode.C))
-        {
-            cam.transform.localRotation = !look_back ? cam_inverted : cam_initial;
-            cam.transform.localPosition = !look_back ? cam_lookback_pos : cam_initial_pos;
-        }
-        look_back = Input.GetKey(KeyCode.C);
     }
 
     public override void OnStartNetwork()
@@ -149,7 +172,6 @@ public class SimpleCarController : NetworkBehaviour
             base.TimeManager.OnTick += TimeManager_OnTick;
             base.TimeManager.OnPostTick += TimeManager_OnPostTick;
         }
-        gameObject.name += $"Id ({base.OwnerId})";
     }
 
     public override void OnStopNetwork()
@@ -160,22 +182,6 @@ public class SimpleCarController : NetworkBehaviour
             base.TimeManager.OnTick -= TimeManager_OnTick;
             base.TimeManager.OnPostTick -= TimeManager_OnPostTick;
         }
-    }
-
-    public override void OnStartClient()
-    {
-        base.OnStartClient();
-
-        if (base.IsOwner)
-        {
-            cam.enabled = true;
-        }
-        else
-        {
-            Destroy(cam.gameObject.GetComponent<AudioListener>());
-        }
-
-        Cursor.lockState = CursorLockMode.Locked;
     }
 
     public override void OnSpawnServer(NetworkConnection connection)
@@ -189,7 +195,11 @@ public class SimpleCarController : NetworkBehaviour
             rb.velocity,
             rb.angularVelocity,
             rotationInPreviousFrame,
-            currentGear
+            currentGear,
+            wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
+            wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
+            wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque,
+            wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque
         );
 
         TargetSyncInitialState(connection, rd);
@@ -203,13 +213,19 @@ public class SimpleCarController : NetworkBehaviour
 
     private void TimeManager_OnTick()
     {
-        if (base.IsOwner)
+        if (base.IsServerInitialized)
         {
-            Move(BuildMoveData());
-        }
-        else if (base.IsServerInitialized)
-        {
-            Move(default);
+            float tickDelta = (float)TimeManager.TickDelta;
+
+            // Search for target player periodically
+            searchTimer += tickDelta;
+            if (searchTimer >= targetSearchInterval || targetPlayer == null)
+            {
+                searchTimer = 0f;
+                FindNearestPlayer();
+            }
+
+            Move(BuildAiMoveData(tickDelta));
         }
     }
 
@@ -221,12 +237,100 @@ public class SimpleCarController : NetworkBehaviour
         }
     }
 
-    private MoveData BuildMoveData()
+    private MoveData BuildAiMoveData(float delta)
     {
-        if (!base.IsOwner)
-            return default;
+        // 1. Execute Unstuck State Machine
+        if (currentState == AiState.UnstuckReversing)
+        {
+            stateTimer -= delta;
+            if (stateTimer <= 0f)
+            {
+                currentState = AiState.UnstuckForward;
+                stateTimer = unstuckForwardDuration;
+            }
+            return new MoveData(unstuckSteerDirection, -1f);
+        }
 
-        return new MoveData(current_horizontal, current_vertical);
+        if (currentState == AiState.UnstuckForward)
+        {
+            stateTimer -= delta;
+            if (stateTimer <= 0f)
+            {
+                currentState = AiState.Chasing;
+                stuckTimer = 0f;
+            }
+            return new MoveData(0f, 1f);
+        }
+
+        if (targetPlayer == null)
+            return new MoveData(0f, 0f);
+
+        // 2. Floating Origin Vector & Angle Calculation
+        Vector3d realTargetPos = OffsetUtils.GetRealPosition(targetPlayer);
+        Vector3d realSelfPos = OffsetUtils.GetRealPosition(transform);
+        Vector3 worldDelta = OffsetUtils.ToVector3(realTargetPos - realSelfPos);
+        Vector3 localTarget = transform.InverseTransformDirection(worldDelta);
+
+        // Calculate angle (-180 to +180 deg) relative to forward
+        float targetAngle = Vector3.SignedAngle(Vector3.forward, localTarget, Vector3.up);
+
+        float steer;
+        float throttle;
+
+        // Trigger reverse ONLY when the player is significantly behind (>120 deg)
+        if (Mathf.Abs(targetAngle) > 120f)
+        {
+            throttle = -1f;
+            // In reverse, steering opposite to target direction swings front nose toward target
+            steer = (targetAngle > 0f) ? -1f : 1f;
+        }
+        else
+        {
+            throttle = 1f;
+            steer = Mathf.Clamp(targetAngle / maxSteerAngle, -1f, 1f);
+        }
+
+        // 3. Stuck Detection Logic
+        bool isStationary = rb.velocity.sqrMagnitude < (stuckSpeedThreshold * stuckSpeedThreshold);
+        if (isStationary && Mathf.Abs(throttle) > 0.1f)
+        {
+            stuckTimer += delta;
+            if (stuckTimer >= stuckTimeThreshold)
+            {
+                currentState = AiState.UnstuckReversing;
+                stateTimer = unstuckReverseDuration;
+                unstuckSteerDirection = (targetAngle > 0f) ? -1f : 1f;
+                stuckTimer = 0f;
+            }
+        }
+        else
+        {
+            stuckTimer = Mathf.Max(0f, stuckTimer - delta);
+        }
+
+        return new MoveData(steer, throttle);
+    }
+    private void FindNearestPlayer()
+    {
+        SimpleCarController[] players = Object.FindObjectsByType<SimpleCarController>(FindObjectsSortMode.None);
+        float minSqrDistance = float.MaxValue;
+        Transform nearest = null;
+        Vector3d currentPos = OffsetUtils.GetRealPosition(transform);
+
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (players[i] == null || !players[i].gameObject.activeInHierarchy)
+                continue;
+
+            float sqrDist = (float)Vector3d.SquaredMagnitude(OffsetUtils.GetRealPosition(players[i].transform) - currentPos);
+            if (sqrDist < minSqrDistance)
+            {
+                minSqrDistance = sqrDist;
+                nearest = players[i].transform;
+            }
+        }
+
+        targetPlayer = nearest;
     }
 
     private void UpdateCurrentSpeed()
@@ -249,9 +353,8 @@ public class SimpleCarController : NetworkBehaviour
 
     private void HandleDrive()
     {
-        float targetTorque = (verticalInput != 0) ? (motorForce * verticalInput / 2f) : 0f;
-        wheelColliders[0].motorTorque = targetTorque;
-        wheelColliders[1].motorTorque = targetTorque;
+        wheelColliders[0].motorTorque = motorForce * verticalInput / 2;
+        wheelColliders[1].motorTorque = motorForce * verticalInput / 2;
 
         if (!isReversing && verticalInput < 0 && rb.velocity.magnitude > 1)
         {
@@ -283,8 +386,8 @@ public class SimpleCarController : NetworkBehaviour
     {
         for (int i = 0; i < wheelMeshes.Length; i++)
         {
-            Vector3 pos;
-            Quaternion quat;
+            Vector3 pos = wheelMeshes[i].position;
+            Quaternion quat = wheelMeshes[i].rotation;
 
             wheelColliders[i].GetWorldPose(out pos, out quat);
 
@@ -351,7 +454,7 @@ public class SimpleCarController : NetworkBehaviour
                 wheelColliders[0].motorTorque *= 0.9f;
             }
             wheelColliders[1].GetGroundHit(out hit);
-            if (hit.forwardSlip >= slipLimit && wheelColliders[1].motorTorque > 0)
+            if (hit.forwardSlip >= slipLimit && wheelColliders[0].motorTorque > 0)
             {
                 wheelColliders[1].motorTorque *= 0.9f;
             }
@@ -360,17 +463,13 @@ public class SimpleCarController : NetworkBehaviour
 
     private void SteeringAssist()
     {
-        float currentY = transform.eulerAngles.y;
-        float deltaY = Mathf.DeltaAngle(rotationInPreviousFrame, currentY);
-
-        if (Mathf.Abs(deltaY) < 10f && steeringAssist && rb.velocity.sqrMagnitude > 0.1f)
+        if (Mathf.Abs(rotationInPreviousFrame - transform.eulerAngles.y) < 10f && steeringAssist)
         {
-            float turnadjust = deltaY * steeringAssistRatio;
+            var turnadjust = (transform.eulerAngles.y - rotationInPreviousFrame) * steeringAssistRatio;
             Quaternion velocityRotation = Quaternion.AngleAxis(turnadjust, Vector3.up);
             rb.velocity = velocityRotation * rb.velocity;
         }
-
-        rotationInPreviousFrame = currentY;
+        rotationInPreviousFrame = transform.eulerAngles.y;
     }
 
     private void HandleGearChange()
@@ -418,24 +517,16 @@ public class SimpleCarController : NetworkBehaviour
 
     private void HandleAudio()
     {
+        if (audioSource == null) return;
         float pitch = ULerp(minimumPitch, maximumPitch, engineRpm);
-
-        if (pitch < minimumPitch)
-        {
-            pitch = minimumPitch;
-        }
-
-        audioSource.pitch = pitch;
+        audioSource.pitch = Mathf.Max(pitch, minimumPitch);
     }
 
-    public float GetCurrentSpeed()
-    {
-        return Mathf.Floor(currentSpeed);
-    }
+    public float GetCurrentSpeed() => Mathf.Floor(currentSpeed);
 
     public void MuteAudio()
     {
-        audioSource.volume = 0;
+        if (audioSource != null) audioSource.volume = 0;
     }
 
     public void ActivateBoost()
@@ -457,7 +548,11 @@ public class SimpleCarController : NetworkBehaviour
             rb.velocity,
             rb.angularVelocity,
             rotationInPreviousFrame,
-            currentGear
+            currentGear,
+            wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
+            wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
+            wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque,
+            wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque
         );
 
         Reconciliation(rd);
@@ -494,6 +589,13 @@ public class SimpleCarController : NetworkBehaviour
         rotationInPreviousFrame = rd.RotationInPreviousFrame;
         currentGear = rd.CurrentGear;
 
-        Physics.SyncTransforms();
+        wheelColliders[0].steerAngle = rd.FrontLeftSteerAngle;
+        wheelColliders[1].steerAngle = rd.FrontRightSteerAngle;
+        wheelColliders[0].motorTorque = rd.FrontLeftMotorTorque;
+        wheelColliders[1].motorTorque = rd.FrontRightMotorTorque;
+        wheelColliders[0].brakeTorque = rd.FrontLeftBrakeTorque;
+        wheelColliders[1].brakeTorque = rd.FrontRightBrakeTorque;
+        wheelColliders[2].brakeTorque = rd.BackLeftBrakeTorque;
+        wheelColliders[3].brakeTorque = rd.BackRightBrakeTorque;
     }
 }
