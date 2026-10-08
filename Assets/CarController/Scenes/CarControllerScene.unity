@@ -1193,7 +1193,7 @@ MonoBehaviour:
     MinimumJoinDistance: 100
     Hysteresis: 100
     MaxScenes: 10
-    logging: 1
+    logging: 0
 --- !u!1 &372885010
 GameObject:
   m_ObjectHideFlags: 0
