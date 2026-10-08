@@ -18,7 +18,8 @@ https://github.com/user-attachments/assets/794c6731-bb2b-4073-9e0f-b35f3f6c8e3e
 ## How to install
 - Install FishNet from the Unity Asset Store
 - Click "Add package from git URL..." in the Unity Package Manager (UPM) and paste in https://github.com/hudmarc/FFO-FishNet-Floating-Origin.git
-- [ParrelSync](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://github.com/VeriorPies/ParrelSync&ved=2ahUKEwiw7IHfqb-UAxXCUMMIHfykCa4QFnoECA8QAQ&usg=AOvVaw0eEHgZuqEmuzfgLX-tsBtY) is very helpful for locally testing multiple clients.
+- Download this Git repo and extract it into your project directory, then make sure `CarControllerScene` is in your build settings.
+- I recommend [ParrelSync](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://github.com/VeriorPies/ParrelSync&ved=2ahUKEwiw7IHfqb-UAxXCUMMIHfykCa4QFnoECA8QAQ&usg=AOvVaw0eEHgZuqEmuzfgLX-tsBtY) for easily testing multiple clients locally.
 
 ## FAQ
 
