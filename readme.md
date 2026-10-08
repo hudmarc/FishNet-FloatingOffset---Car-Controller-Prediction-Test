@@ -4,7 +4,11 @@
 
 This is my attempt at trying to adapt [an existing CSP car controller](https://github.com/Roceh/FishNet---Car-Controller-Prediction-Test) to use my [floating offset](https://github.com/hudmarc/FloatingOffset) package.
 
-https://github.com/user-attachments/assets/2a9bc9ae-5974-4382-97b6-190bbaac3f85
+
+
+https://github.com/user-attachments/assets/794c6731-bb2b-4073-9e0f-b35f3f6c8e3e
+
+
 
 ## Known issues
 - ~~Jitter on clients~~ Mostly fixed, seemed to be caused by running the physics loop on PostTick instead of Tick
