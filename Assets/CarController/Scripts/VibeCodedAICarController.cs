@@ -48,86 +48,9 @@ public class VibeCodedAICarController : NetworkBehaviour
     [SerializeField] private WheelCollider[] wheelColliders = new WheelCollider[4];
     [SerializeField] private Transform[] wheelMeshes = new Transform[4];
 
+    private Rigidbody rb;
     private OffsetView view;
 
-    #region Types
-
-    public struct MoveData : IReplicateData
-    {
-        public float Horizontal;
-        public float Vertical;
-
-        private uint _tick;
-        public void Dispose() { }
-        public uint GetTick() => _tick;
-        public void SetTick(uint value) => _tick = value;
-
-        public MoveData(float horizontal, float vertical) : this()
-        {
-            Horizontal = horizontal;
-            Vertical = vertical;
-        }
-    }
-
-    public struct ReconcileData : IReconcileData
-    {
-        public double PositionX;
-        public double PositionY;
-        public double PositionZ;
-        public double OffsetX, OffsetY, OffsetZ;
-        public Quaternion Rotation;
-        public Vector3 Velocity;
-        public Vector3 AngularVelocity;
-        public float RotationInPreviousFrame;
-        public int CurrentGear;
-        public float FrontLeftSteerAngle;
-        public float FrontRightSteerAngle;
-        public float FrontLeftMotorTorque;
-        public float FrontRightMotorTorque;
-
-        public float FrontLeftBrakeTorque;
-        public float FrontRightBrakeTorque;
-        public float BackLeftBrakeTorque;
-        public float BackRightBrakeTorque;
-
-        private uint _tick;
-        public void Dispose() { }
-        public uint GetTick() => _tick;
-        public void SetTick(uint value) => _tick = value;
-
-        public ReconcileData(Vector3d position, Vector3d offset, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear,
-               float frontLeftSteerAngle, float frontRightSteerAngle,
-               float frontLeftMotorTorque, float frontRightMotorTorque,
-               float frontLeftBrakeTorque, float frontRightBrakeTorque,
-               float backLeftBrakeTorque, float backRightBrakeTorque) : this()
-        {
-            PositionX = position.x;
-            PositionY = position.y;
-            PositionZ = position.z;
-            OffsetX = offset.x;
-            OffsetY = offset.y;
-            OffsetZ = offset.z;
-            Rotation = rotation;
-            Velocity = velocity;
-            AngularVelocity = angularVelocity;
-            RotationInPreviousFrame = rotationInPreviousFrame;
-            CurrentGear = currentGear;
-
-            FrontLeftSteerAngle = frontLeftSteerAngle;
-            FrontRightSteerAngle = frontRightSteerAngle;
-            FrontLeftMotorTorque = frontLeftMotorTorque;
-            FrontRightMotorTorque = frontRightMotorTorque;
-
-            FrontLeftBrakeTorque = frontLeftBrakeTorque;
-            FrontRightBrakeTorque = frontRightBrakeTorque;
-            BackLeftBrakeTorque = backLeftBrakeTorque;
-            BackRightBrakeTorque = backRightBrakeTorque;
-        }
-    }
-
-    #endregion
-
-    private Rigidbody rb;
     private float horizontalInput;
     private float verticalInput;
     private bool isReversing = false;
@@ -155,91 +78,56 @@ public class VibeCodedAICarController : NetworkBehaviour
     private void Start()
     {
         motorForceWithoutBoost = motorForce;
+
+        // Disable local physics simulation on non-server clients so NetworkTransform moves the vehicle
+        if (!base.IsServerInitialized)
+        {
+            rb.isKinematic = true;
+        }
     }
 
     private void Update()
     {
+        // Visual wheel mesh alignment & engine pitch audio update on all clients
         HandleWheelTransform();
         CalculateEngineRevs();
         HandleAudio();
     }
 
-    public override void OnStartNetwork()
+    private void FixedUpdate()
     {
-        base.OnStartNetwork();
-        if (base.TimeManager != null)
+        // Only the server runs AI decision making and vehicle physics
+        if (!base.IsServerInitialized) return;
+
+        float fixedDelta = Time.fixedDeltaTime;
+
+        // 1. Target Acquisition
+        searchTimer += fixedDelta;
+        if (searchTimer >= targetSearchInterval || targetPlayer == null)
         {
-            base.TimeManager.OnTick += TimeManager_OnTick;
-            base.TimeManager.OnPostTick += TimeManager_OnPostTick;
+            searchTimer = 0f;
+            FindNearestPlayer();
         }
+
+        // 2. Process AI State Machine & Inputs
+        UpdateAiDecision(fixedDelta);
+
+        // 3. Execute Server Physics Loop
+        UpdateCurrentSpeed();
+        HandleSteering();
+        HandleDrive();
+        AntiRollForce();
+        DetectReverse();
+        TractionControl();
+        SteeringAssist();
+        HandleGearChange();
     }
 
-    public override void OnStopNetwork()
+    #region AI Logic
+
+    private void UpdateAiDecision(float delta)
     {
-        base.OnStopNetwork();
-        if (base.TimeManager != null)
-        {
-            base.TimeManager.OnTick -= TimeManager_OnTick;
-            base.TimeManager.OnPostTick -= TimeManager_OnPostTick;
-        }
-    }
-
-    public override void OnSpawnServer(NetworkConnection connection)
-    {
-        base.OnSpawnServer(connection);
-
-        ReconcileData rd = new ReconcileData(
-            OffsetUtils.GetRealPosition(view.transform),
-            OffsetBehaviour.manager.GetLocalOffset(gameObject.scene),
-            transform.rotation,
-            rb.velocity,
-            rb.angularVelocity,
-            rotationInPreviousFrame,
-            currentGear,
-            wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
-            wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
-            wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque,
-            wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque
-        );
-
-        TargetSyncInitialState(connection, rd);
-    }
-
-    [TargetRpc]
-    private void TargetSyncInitialState(NetworkConnection connection, ReconcileData rd)
-    {
-        Reconciliation(rd);
-    }
-
-    private void TimeManager_OnTick()
-    {
-        if (base.IsServerInitialized)
-        {
-            float tickDelta = (float)TimeManager.TickDelta;
-
-            // Search for target player periodically
-            searchTimer += tickDelta;
-            if (searchTimer >= targetSearchInterval || targetPlayer == null)
-            {
-                searchTimer = 0f;
-                FindNearestPlayer();
-            }
-
-            Move(BuildAiMoveData(tickDelta));
-        }
-    }
-
-    private void TimeManager_OnPostTick()
-    {
-        if (base.IsServerInitialized)
-        {
-            CreateReconcile();
-        }
-    }
-
-    private MoveData BuildAiMoveData(float delta)
-    {
-        // 1. Execute Unstuck State Machine
+        // Execute Unstuck State Machine
         if (currentState == AiState.UnstuckReversing)
         {
             stateTimer -= delta;
@@ -248,7 +136,9 @@ public class VibeCodedAICarController : NetworkBehaviour
                 currentState = AiState.UnstuckForward;
                 stateTimer = unstuckForwardDuration;
             }
-            return new MoveData(unstuckSteerDirection, -1f);
+            horizontalInput = unstuckSteerDirection;
+            verticalInput = -1f;
+            return;
         }
 
         if (currentState == AiState.UnstuckForward)
@@ -259,13 +149,19 @@ public class VibeCodedAICarController : NetworkBehaviour
                 currentState = AiState.Chasing;
                 stuckTimer = 0f;
             }
-            return new MoveData(0f, 1f);
+            horizontalInput = 0f;
+            verticalInput = 1f;
+            return;
         }
 
         if (targetPlayer == null)
-            return new MoveData(0f, 0f);
+        {
+            horizontalInput = 0f;
+            verticalInput = 0f;
+            return;
+        }
 
-        // 2. Floating Origin Vector & Angle Calculation
+        // Floating Origin Vector & Angle Calculation
         Vector3d realTargetPos = OffsetUtils.GetRealPosition(targetPlayer);
         Vector3d realSelfPos = OffsetUtils.GetRealPosition(transform);
         Vector3 worldDelta = OffsetUtils.ToVector3(realTargetPos - realSelfPos);
@@ -274,25 +170,22 @@ public class VibeCodedAICarController : NetworkBehaviour
         // Calculate angle (-180 to +180 deg) relative to forward
         float targetAngle = Vector3.SignedAngle(Vector3.forward, localTarget, Vector3.up);
 
-        float steer;
-        float throttle;
-
         // Trigger reverse ONLY when the player is significantly behind (>120 deg)
         if (Mathf.Abs(targetAngle) > 120f)
         {
-            throttle = -1f;
+            verticalInput = -1f;
             // In reverse, steering opposite to target direction swings front nose toward target
-            steer = (targetAngle > 0f) ? -1f : 1f;
+            horizontalInput = (targetAngle > 0f) ? -1f : 1f;
         }
         else
         {
-            throttle = 1f;
-            steer = Mathf.Clamp(targetAngle / maxSteerAngle, -1f, 1f);
+            verticalInput = 1f;
+            horizontalInput = Mathf.Clamp(targetAngle / maxSteerAngle, -1f, 1f);
         }
 
-        // 3. Stuck Detection Logic
+        // Stuck Detection Logic
         bool isStationary = rb.velocity.sqrMagnitude < (stuckSpeedThreshold * stuckSpeedThreshold);
-        if (isStationary && Mathf.Abs(throttle) > 0.1f)
+        if (isStationary && Mathf.Abs(verticalInput) > 0.1f)
         {
             stuckTimer += delta;
             if (stuckTimer >= stuckTimeThreshold)
@@ -307,9 +200,8 @@ public class VibeCodedAICarController : NetworkBehaviour
         {
             stuckTimer = Mathf.Max(0f, stuckTimer - delta);
         }
-
-        return new MoveData(steer, throttle);
     }
+
     private void FindNearestPlayer()
     {
         SimpleCarController[] players = Object.FindObjectsByType<SimpleCarController>(FindObjectsSortMode.None);
@@ -333,16 +225,15 @@ public class VibeCodedAICarController : NetworkBehaviour
         targetPlayer = nearest;
     }
 
+    #endregion
+
+    #region Vehicle Physics Logic
+
     private void UpdateCurrentSpeed()
     {
-        if (speedType == SpeedType.KPH)
-        {
-            currentSpeed = rb.velocity.magnitude * 3.6f;
-        }
-        else
-        {
-            currentSpeed = rb.velocity.magnitude * 2.23693629f;
-        }
+        currentSpeed = (speedType == SpeedType.KPH)
+            ? rb.velocity.magnitude * 3.6f
+            : rb.velocity.magnitude * 2.23693629f;
     }
 
     private void HandleSteering()
@@ -353,10 +244,11 @@ public class VibeCodedAICarController : NetworkBehaviour
 
     private void HandleDrive()
     {
-        wheelColliders[0].motorTorque = motorForce * verticalInput / 2;
-        wheelColliders[1].motorTorque = motorForce * verticalInput / 2;
+        float targetTorque = motorForce * verticalInput / 2f;
+        wheelColliders[0].motorTorque = targetTorque;
+        wheelColliders[1].motorTorque = targetTorque;
 
-        if (!isReversing && verticalInput < 0 && rb.velocity.magnitude > 1)
+        if (!isReversing && verticalInput < 0 && rb.velocity.magnitude > 1f)
         {
             ApplyBrakes();
         }
@@ -386,12 +278,11 @@ public class VibeCodedAICarController : NetworkBehaviour
     {
         for (int i = 0; i < wheelMeshes.Length; i++)
         {
-            Vector3 pos = wheelMeshes[i].position;
-            Quaternion quat = wheelMeshes[i].rotation;
+            if (wheelColliders[i] == null || wheelMeshes[i] == null) continue;
 
+            Vector3 pos;
+            Quaternion quat;
             wheelColliders[i].GetWorldPose(out pos, out quat);
-
-            pos = pos - wheelColliders[i].transform.parent.position + wheelMeshes[i].parent.position;
 
             wheelMeshes[i].position = pos;
             wheelMeshes[i].rotation = quat;
@@ -445,38 +336,39 @@ public class VibeCodedAICarController : NetworkBehaviour
 
     private void TractionControl()
     {
-        if (tractionControl)
+        if (!tractionControl) return;
+
+        WheelHit hit;
+        if (wheelColliders[0].GetGroundHit(out hit) && hit.forwardSlip >= slipLimit && wheelColliders[0].motorTorque > 0)
         {
-            WheelHit hit;
-            wheelColliders[0].GetGroundHit(out hit);
-            if (hit.forwardSlip >= slipLimit && wheelColliders[0].motorTorque > 0)
-            {
-                wheelColliders[0].motorTorque *= 0.9f;
-            }
-            wheelColliders[1].GetGroundHit(out hit);
-            if (hit.forwardSlip >= slipLimit && wheelColliders[0].motorTorque > 0)
-            {
-                wheelColliders[1].motorTorque *= 0.9f;
-            }
+            wheelColliders[0].motorTorque *= 0.9f;
+        }
+        if (wheelColliders[1].GetGroundHit(out hit) && hit.forwardSlip >= slipLimit && wheelColliders[1].motorTorque > 0)
+        {
+            wheelColliders[1].motorTorque *= 0.9f;
         }
     }
 
     private void SteeringAssist()
     {
-        if (Mathf.Abs(rotationInPreviousFrame - transform.eulerAngles.y) < 10f && steeringAssist)
+        float currentY = transform.eulerAngles.y;
+        float deltaY = Mathf.DeltaAngle(rotationInPreviousFrame, currentY);
+
+        if (Mathf.Abs(deltaY) < 10f && steeringAssist && rb.velocity.sqrMagnitude > 0.1f)
         {
-            var turnadjust = (transform.eulerAngles.y - rotationInPreviousFrame) * steeringAssistRatio;
+            float turnadjust = deltaY * steeringAssistRatio;
             Quaternion velocityRotation = Quaternion.AngleAxis(turnadjust, Vector3.up);
             rb.velocity = velocityRotation * rb.velocity;
         }
-        rotationInPreviousFrame = transform.eulerAngles.y;
+
+        rotationInPreviousFrame = currentY;
     }
 
     private void HandleGearChange()
     {
         float speedRatio = Mathf.Abs(currentSpeed / topSpeed);
-        float upshiftLimit = 1 / (float)numberOfGears * (currentGear + 1);
-        float downshiftLimit = 1 / (float)numberOfGears * currentGear;
+        float upshiftLimit = 1f / numberOfGears * (currentGear + 1);
+        float downshiftLimit = 1f / numberOfGears * currentGear;
 
         if (currentGear > 0 && speedRatio < downshiftLimit)
         {
@@ -489,113 +381,29 @@ public class VibeCodedAICarController : NetworkBehaviour
         }
     }
 
-    private static float ULerp(float from, float to, float value)
-    {
-        return (1.0f - value) * from + value * to;
-    }
-
-    private static float CurveFactor(float factor)
-    {
-        return 1 - (1 - factor) * (1 - factor);
-    }
-
-    private void CalculateGearFactor()
-    {
-        float f = (1 / (float)numberOfGears);
-        var targetGearFactor = Mathf.InverseLerp(f * currentGear, f * (currentGear + 1), Mathf.Abs(currentSpeed / topSpeed));
-        gearFactor = Mathf.Lerp(gearFactor, targetGearFactor, (float)(TimeManager.TickDelta * 5f));
-    }
-
     private void CalculateEngineRevs()
     {
-        CalculateGearFactor();
+        float f = 1f / numberOfGears;
+        var targetGearFactor = Mathf.InverseLerp(f * currentGear, f * (currentGear + 1), Mathf.Abs(currentSpeed / topSpeed));
+        gearFactor = Mathf.Lerp(gearFactor, targetGearFactor, Time.deltaTime * 5f);
+
         var gearNumFactor = currentGear / (float)numberOfGears;
-        var revsRangeMin = ULerp(0f, 1f, CurveFactor(gearNumFactor));
-        var revsRangeMax = ULerp(1f, 1f, gearNumFactor);
-        engineRpm = ULerp(revsRangeMin, revsRangeMax, gearFactor);
+        var revsRangeMin = Mathf.Lerp(0f, 1f, 1f - (1f - gearNumFactor) * (1f - gearNumFactor));
+        var revsRangeMax = Mathf.Lerp(1f, 1f, gearNumFactor);
+        engineRpm = Mathf.Lerp(revsRangeMin, revsRangeMax, gearFactor);
     }
 
     private void HandleAudio()
     {
         if (audioSource == null) return;
-        float pitch = ULerp(minimumPitch, maximumPitch, engineRpm);
+        float pitch = Mathf.Lerp(minimumPitch, maximumPitch, engineRpm);
         audioSource.pitch = Mathf.Max(pitch, minimumPitch);
     }
 
     public float GetCurrentSpeed() => Mathf.Floor(currentSpeed);
+    public void MuteAudio() { if (audioSource != null) audioSource.volume = 0; }
+    public void ActivateBoost() => motorForce = motorForceWithoutBoost * boostZoneMultiplier;
+    public void DeactivateBoost() => motorForce = motorForceWithoutBoost;
 
-    public void MuteAudio()
-    {
-        if (audioSource != null) audioSource.volume = 0;
-    }
-
-    public void ActivateBoost()
-    {
-        motorForce = motorForceWithoutBoost * boostZoneMultiplier;
-    }
-
-    public void DeactivateBoost()
-    {
-        motorForce = motorForceWithoutBoost;
-    }
-
-    public override void CreateReconcile()
-    {
-        ReconcileData rd = new ReconcileData(
-            OffsetUtils.GetRealPosition(view.transform),
-            OffsetBehaviour.manager.GetLocalOffset(gameObject.scene),
-            transform.rotation,
-            rb.velocity,
-            rb.angularVelocity,
-            rotationInPreviousFrame,
-            currentGear,
-            wheelColliders[0].steerAngle, wheelColliders[1].steerAngle,
-            wheelColliders[0].motorTorque, wheelColliders[1].motorTorque,
-            wheelColliders[0].brakeTorque, wheelColliders[1].brakeTorque,
-            wheelColliders[2].brakeTorque, wheelColliders[3].brakeTorque
-        );
-
-        Reconciliation(rd);
-    }
-
-    [Replicate]
-    private void Move(MoveData md, ReplicateState state = ReplicateState.Invalid, Channel channel = Channel.Unreliable)
-    {
-        horizontalInput = md.Horizontal;
-        verticalInput = md.Vertical;
-
-        UpdateCurrentSpeed();
-        HandleSteering();
-        HandleDrive();
-
-        AntiRollForce();
-        DetectReverse();
-        TractionControl();
-        SteeringAssist();
-        HandleGearChange();
-    }
-
-    [Reconcile]
-    private void Reconciliation(ReconcileData rd, Channel channel = Channel.Unreliable)
-    {
-        var position = new Vector3d(rd.PositionX, rd.PositionY, rd.PositionZ);
-        var local_pos = position - OffsetBehaviour.manager.GetLocalOffset(gameObject.scene);
-
-        rb.position = new Vector3((float)local_pos.x, (float)local_pos.y, (float)local_pos.z);
-
-        transform.rotation = rd.Rotation;
-        rb.velocity = rd.Velocity;
-        rb.angularVelocity = rd.AngularVelocity;
-        rotationInPreviousFrame = rd.RotationInPreviousFrame;
-        currentGear = rd.CurrentGear;
-
-        wheelColliders[0].steerAngle = rd.FrontLeftSteerAngle;
-        wheelColliders[1].steerAngle = rd.FrontRightSteerAngle;
-        wheelColliders[0].motorTorque = rd.FrontLeftMotorTorque;
-        wheelColliders[1].motorTorque = rd.FrontRightMotorTorque;
-        wheelColliders[0].brakeTorque = rd.FrontLeftBrakeTorque;
-        wheelColliders[1].brakeTorque = rd.FrontRightBrakeTorque;
-        wheelColliders[2].brakeTorque = rd.BackLeftBrakeTorque;
-        wheelColliders[3].brakeTorque = rd.BackRightBrakeTorque;
-    }
+    #endregion
 }

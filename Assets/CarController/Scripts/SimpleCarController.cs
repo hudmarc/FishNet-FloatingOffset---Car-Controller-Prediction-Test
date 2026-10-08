@@ -1,9 +1,7 @@
 ﻿using FishNet.Object;
-using FishNet.Object.Prediction;
 using FishNet.Transporting;
 using FloatingOffset.Runtime;
 using UnityEngine;
-using FishNet.Connection;
 
 enum SpeedType
 {
@@ -14,87 +12,38 @@ enum SpeedType
 public class SimpleCarController : NetworkBehaviour
 {
     [SerializeField] private GameObject visual;
-    [SerializeField] private float maxSteerAngle;
-    [SerializeField] private float motorForce;
-    [SerializeField] private float brakeForce;
-    [SerializeField] private float topSpeed;
+    [SerializeField] private float maxSteerAngle = 30f;
+    [SerializeField] private float motorForce = 1500f;
+    [SerializeField] private float brakeForce = 3000f;
+    [SerializeField] private float topSpeed = 150f;
     [SerializeField] private SpeedType speedType;
     [SerializeField] private float antiRoll = 1000f;
     [SerializeField] private bool tractionControl = true;
     [SerializeField] private float slipLimit = 0.3f;
     [SerializeField] private bool steeringAssist = true;
     [SerializeField] private float steeringAssistRatio = 0.5f;
-    [SerializeField] private int numberOfGears;
+    [SerializeField] private int numberOfGears = 5;
     [SerializeField] private AudioSource audioSource;
-    [SerializeField] private float minimumPitch;
-    [SerializeField] private float maximumPitch;
-    [SerializeField] private float boostZoneMultiplier;
+    [SerializeField] private float minimumPitch = 1f;
+    [SerializeField] private float maximumPitch = 3f;
+    [SerializeField] private float boostZoneMultiplier = 1.5f;
     [SerializeField] private WheelCollider[] wheelColliders = new WheelCollider[4];
     [SerializeField] private Transform[] wheelMeshes = new Transform[4];
     [SerializeField] private Camera cam;
-    [SerializeField] private float lookBackOffset = 10;
-    private OffsetView view;
-
-    #region Types
-
-    public struct MoveData : IReplicateData
-    {
-        public float Horizontal;
-        public float Vertical;
-
-        private uint _tick;
-        public void Dispose() { }
-        public uint GetTick() => _tick;
-        public void SetTick(uint value) => _tick = value;
-
-        public MoveData(float horizontal, float vertical) : this()
-        {
-            Horizontal = horizontal;
-            Vertical = vertical;
-        }
-    }
-
-    public struct ReconcileData : IReconcileData
-    {
-        public double PositionX;
-        public double PositionY;
-        public double PositionZ;
-        public double OffsetX, OffsetY, OffsetZ;
-        public Quaternion Rotation;
-        public Vector3 Velocity;
-        public Vector3 AngularVelocity;
-        public float RotationInPreviousFrame;
-        public int CurrentGear;
-
-        private uint _tick;
-        public void Dispose() { }
-        public uint GetTick() => _tick;
-        public void SetTick(uint value) => _tick = value;
-
-        public ReconcileData(Vector3d position, Vector3d offset, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, float rotationInPreviousFrame, int currentGear) : this()
-        {
-            PositionX = position.x;
-            PositionY = position.y;
-            PositionZ = position.z;
-            OffsetX = offset.x;
-            OffsetY = offset.y;
-            OffsetZ = offset.z;
-            Rotation = rotation;
-            Velocity = velocity;
-            AngularVelocity = angularVelocity;
-            RotationInPreviousFrame = rotationInPreviousFrame;
-            CurrentGear = currentGear;
-        }
-    }
-
-    #endregion
+    [SerializeField] private float lookBackOffset = 10f;
 
     private Rigidbody rb;
-    private float current_horizontal;
-    private float current_vertical;
-    private bool look_back = false;
+    private OffsetView view;
+
+    // Synchronized inputs processed by Server
     private float horizontalInput;
     private float verticalInput;
+
+    // Input tracking to reduce RPC spam
+    private float lastSentHorizontal;
+    private float lastSentVertical;
+
+    private bool look_back = false;
     private bool isReversing = false;
     private float rotationInPreviousFrame;
     private int currentGear = 0;
@@ -112,53 +61,25 @@ public class SimpleCarController : NetworkBehaviour
     {
         rb = GetComponent<Rigidbody>();
         view = GetComponent<OffsetView>();
-        cam.enabled = false;
-        cam_initial = cam.transform.localRotation;
-        cam_inverted = cam_initial * Quaternion.AngleAxis(180, Vector3.up);
-        cam_initial_pos = cam.transform.localPosition;
-        cam_lookback_pos = cam_initial_pos + Vector3.forward * lookBackOffset;
+        
+        if (cam != null)
+        {
+            cam.enabled = false;
+            cam_initial = cam.transform.localRotation;
+            cam_inverted = cam_initial * Quaternion.AngleAxis(180, Vector3.up);
+            cam_initial_pos = cam.transform.localPosition;
+            cam_lookback_pos = cam_initial_pos + Vector3.forward * lookBackOffset;
+        }
     }
 
     private void Start()
     {
         motorForceWithoutBoost = motorForce;
-    }
 
-    private void Update()
-    {
-        HandleWheelTransform();
-        CalculateEngineRevs();
-        HandleAudio();
-
-        current_horizontal = Input.GetAxis("Horizontal");
-        current_vertical = Input.GetAxis("Vertical");
-
-        if (look_back != Input.GetKey(KeyCode.C))
+        // Turn off Rigidbody physics on non-server clients so NetworkTransform has full control
+        if (!base.IsServerInitialized)
         {
-            cam.transform.localRotation = !look_back ? cam_inverted : cam_initial;
-            cam.transform.localPosition = !look_back ? cam_lookback_pos : cam_initial_pos;
-        }
-        look_back = Input.GetKey(KeyCode.C);
-    }
-
-    public override void OnStartNetwork()
-    {
-        base.OnStartNetwork();
-        if (base.TimeManager != null)
-        {
-            base.TimeManager.OnTick += TimeManager_OnTick;
-            base.TimeManager.OnPostTick += TimeManager_OnPostTick;
-        }
-        gameObject.name += $"Id ({base.OwnerId})";
-    }
-
-    public override void OnStopNetwork()
-    {
-        base.OnStopNetwork();
-        if (base.TimeManager != null)
-        {
-            base.TimeManager.OnTick -= TimeManager_OnTick;
-            base.TimeManager.OnPostTick -= TimeManager_OnPostTick;
+            rb.isKinematic = true;
         }
     }
 
@@ -168,77 +89,79 @@ public class SimpleCarController : NetworkBehaviour
 
         if (base.IsOwner)
         {
-            cam.enabled = true;
+            if (cam != null) cam.enabled = true;
         }
-        else
+        else if (cam != null)
         {
-            Destroy(cam.gameObject.GetComponent<AudioListener>());
+            AudioListener listener = cam.gameObject.GetComponent<AudioListener>();
+            if (listener != null) Destroy(listener);
         }
 
         Cursor.lockState = CursorLockMode.Locked;
     }
 
-    public override void OnSpawnServer(NetworkConnection connection)
+    private void Update()
     {
-        base.OnSpawnServer(connection);
-
-        ReconcileData rd = new ReconcileData(
-            OffsetUtils.GetRealPosition(view.transform),
-            OffsetBehaviour.manager.GetLocalOffset(gameObject.scene),
-            transform.rotation,
-            rb.velocity,
-            rb.angularVelocity,
-            rotationInPreviousFrame,
-            currentGear
-        );
-
-        TargetSyncInitialState(connection, rd);
-    }
-
-    [TargetRpc]
-    private void TargetSyncInitialState(NetworkConnection connection, ReconcileData rd)
-    {
-        Reconciliation(rd);
-    }
-
-    private void TimeManager_OnTick()
-    {
+        // 1. Owner collects inputs and sends to server when changed
         if (base.IsOwner)
         {
-            Move(BuildMoveData());
+            float h = Input.GetAxis("Horizontal");
+            float v = Input.GetAxis("Vertical");
+
+            if (Mathf.Abs(h - lastSentHorizontal) > 0.01f || Mathf.Abs(v - lastSentVertical) > 0.01f)
+            {
+                lastSentHorizontal = h;
+                lastSentVertical = v;
+                ServerSubmitInput(h, v);
+            }
+
+            // Camera controls
+            if (cam != null)
+            {
+                if (look_back != Input.GetKey(KeyCode.C))
+                {
+                    cam.transform.localRotation = !look_back ? cam_inverted : cam_initial;
+                    cam.transform.localPosition = !look_back ? cam_lookback_pos : cam_initial_pos;
+                }
+                look_back = Input.GetKey(KeyCode.C);
+            }
         }
-        else if (base.IsServerInitialized)
-        {
-            Move(default);
-        }
+
+        // 2. Visual wheel mesh alignment & audio update on all clients
+        HandleWheelTransform();
+        CalculateEngineRevs();
+        HandleAudio();
     }
 
-    private void TimeManager_OnPostTick()
+    private void FixedUpdate()
     {
-        if (base.IsServerInitialized)
-        {
-            CreateReconcile();
-        }
+        // Only the server runs the vehicle physics loop
+        if (!base.IsServerInitialized) return;
+
+        UpdateCurrentSpeed();
+        HandleSteering();
+        HandleDrive();
+        AntiRollForce();
+        DetectReverse();
+        TractionControl();
+        SteeringAssist();
+        HandleGearChange();
     }
 
-    private MoveData BuildMoveData()
+    [ServerRpc]
+    private void ServerSubmitInput(float horizontal, float vertical, Channel channel = Channel.Unreliable)
     {
-        if (!base.IsOwner)
-            return default;
-
-        return new MoveData(current_horizontal, current_vertical);
+        horizontalInput = Mathf.Clamp(horizontal, -1f, 1f);
+        verticalInput = Mathf.Clamp(vertical, -1f, 1f);
     }
+
+    #region Vehicle Physics Logic
 
     private void UpdateCurrentSpeed()
     {
-        if (speedType == SpeedType.KPH)
-        {
-            currentSpeed = rb.velocity.magnitude * 3.6f;
-        }
-        else
-        {
-            currentSpeed = rb.velocity.magnitude * 2.23693629f;
-        }
+        currentSpeed = (speedType == SpeedType.KPH) 
+            ? rb.velocity.magnitude * 3.6f 
+            : rb.velocity.magnitude * 2.23693629f;
     }
 
     private void HandleSteering()
@@ -253,7 +176,7 @@ public class SimpleCarController : NetworkBehaviour
         wheelColliders[0].motorTorque = targetTorque;
         wheelColliders[1].motorTorque = targetTorque;
 
-        if (!isReversing && verticalInput < 0 && rb.velocity.magnitude > 1)
+        if (!isReversing && verticalInput < 0 && rb.velocity.magnitude > 1f)
         {
             ApplyBrakes();
         }
@@ -283,12 +206,11 @@ public class SimpleCarController : NetworkBehaviour
     {
         for (int i = 0; i < wheelMeshes.Length; i++)
         {
+            if (wheelColliders[i] == null || wheelMeshes[i] == null) continue;
+
             Vector3 pos;
             Quaternion quat;
-
             wheelColliders[i].GetWorldPose(out pos, out quat);
-
-            pos = pos - wheelColliders[i].transform.parent.position + wheelMeshes[i].parent.position;
 
             wheelMeshes[i].position = pos;
             wheelMeshes[i].rotation = quat;
@@ -342,19 +264,16 @@ public class SimpleCarController : NetworkBehaviour
 
     private void TractionControl()
     {
-        if (tractionControl)
+        if (!tractionControl) return;
+
+        WheelHit hit;
+        if (wheelColliders[0].GetGroundHit(out hit) && hit.forwardSlip >= slipLimit && wheelColliders[0].motorTorque > 0)
         {
-            WheelHit hit;
-            wheelColliders[0].GetGroundHit(out hit);
-            if (hit.forwardSlip >= slipLimit && wheelColliders[0].motorTorque > 0)
-            {
-                wheelColliders[0].motorTorque *= 0.9f;
-            }
-            wheelColliders[1].GetGroundHit(out hit);
-            if (hit.forwardSlip >= slipLimit && wheelColliders[1].motorTorque > 0)
-            {
-                wheelColliders[1].motorTorque *= 0.9f;
-            }
+            wheelColliders[0].motorTorque *= 0.9f;
+        }
+        if (wheelColliders[1].GetGroundHit(out hit) && hit.forwardSlip >= slipLimit && wheelColliders[1].motorTorque > 0)
+        {
+            wheelColliders[1].motorTorque *= 0.9f;
         }
     }
 
@@ -376,8 +295,8 @@ public class SimpleCarController : NetworkBehaviour
     private void HandleGearChange()
     {
         float speedRatio = Mathf.Abs(currentSpeed / topSpeed);
-        float upshiftLimit = 1 / (float)numberOfGears * (currentGear + 1);
-        float downshiftLimit = 1 / (float)numberOfGears * currentGear;
+        float upshiftLimit = 1f / numberOfGears * (currentGear + 1);
+        float downshiftLimit = 1f / numberOfGears * currentGear;
 
         if (currentGear > 0 && speedRatio < downshiftLimit)
         {
@@ -390,110 +309,29 @@ public class SimpleCarController : NetworkBehaviour
         }
     }
 
-    private static float ULerp(float from, float to, float value)
-    {
-        return (1.0f - value) * from + value * to;
-    }
-
-    private static float CurveFactor(float factor)
-    {
-        return 1 - (1 - factor) * (1 - factor);
-    }
-
-    private void CalculateGearFactor()
-    {
-        float f = (1 / (float)numberOfGears);
-        var targetGearFactor = Mathf.InverseLerp(f * currentGear, f * (currentGear + 1), Mathf.Abs(currentSpeed / topSpeed));
-        gearFactor = Mathf.Lerp(gearFactor, targetGearFactor, (float)(TimeManager.TickDelta * 5f));
-    }
-
     private void CalculateEngineRevs()
     {
-        CalculateGearFactor();
+        float f = 1f / numberOfGears;
+        var targetGearFactor = Mathf.InverseLerp(f * currentGear, f * (currentGear + 1), Mathf.Abs(currentSpeed / topSpeed));
+        gearFactor = Mathf.Lerp(gearFactor, targetGearFactor, Time.deltaTime * 5f);
+
         var gearNumFactor = currentGear / (float)numberOfGears;
-        var revsRangeMin = ULerp(0f, 1f, CurveFactor(gearNumFactor));
-        var revsRangeMax = ULerp(1f, 1f, gearNumFactor);
-        engineRpm = ULerp(revsRangeMin, revsRangeMax, gearFactor);
+        var revsRangeMin = Mathf.Lerp(0f, 1f, 1f - (1f - gearNumFactor) * (1f - gearNumFactor));
+        var revsRangeMax = Mathf.Lerp(1f, 1f, gearNumFactor);
+        engineRpm = Mathf.Lerp(revsRangeMin, revsRangeMax, gearFactor);
     }
 
     private void HandleAudio()
     {
-        float pitch = ULerp(minimumPitch, maximumPitch, engineRpm);
-
-        if (pitch < minimumPitch)
-        {
-            pitch = minimumPitch;
-        }
-
-        audioSource.pitch = pitch;
+        if (audioSource == null) return;
+        float pitch = Mathf.Lerp(minimumPitch, maximumPitch, engineRpm);
+        audioSource.pitch = Mathf.Max(pitch, minimumPitch);
     }
 
-    public float GetCurrentSpeed()
-    {
-        return Mathf.Floor(currentSpeed);
-    }
+    public float GetCurrentSpeed() => Mathf.Floor(currentSpeed);
+    public void MuteAudio() { if (audioSource != null) audioSource.volume = 0; }
+    public void ActivateBoost() => motorForce = motorForceWithoutBoost * boostZoneMultiplier;
+    public void DeactivateBoost() => motorForce = motorForceWithoutBoost;
 
-    public void MuteAudio()
-    {
-        audioSource.volume = 0;
-    }
-
-    public void ActivateBoost()
-    {
-        motorForce = motorForceWithoutBoost * boostZoneMultiplier;
-    }
-
-    public void DeactivateBoost()
-    {
-        motorForce = motorForceWithoutBoost;
-    }
-
-    public override void CreateReconcile()
-    {
-        ReconcileData rd = new ReconcileData(
-            OffsetUtils.GetRealPosition(view.transform),
-            OffsetBehaviour.manager.GetLocalOffset(gameObject.scene),
-            transform.rotation,
-            rb.velocity,
-            rb.angularVelocity,
-            rotationInPreviousFrame,
-            currentGear
-        );
-
-        Reconciliation(rd);
-    }
-
-    [Replicate]
-    private void Move(MoveData md, ReplicateState state = ReplicateState.Invalid, Channel channel = Channel.Unreliable)
-    {
-        horizontalInput = md.Horizontal;
-        verticalInput = md.Vertical;
-
-        UpdateCurrentSpeed();
-        HandleSteering();
-        HandleDrive();
-
-        AntiRollForce();
-        DetectReverse();
-        TractionControl();
-        SteeringAssist();
-        HandleGearChange();
-    }
-
-    [Reconcile]
-    private void Reconciliation(ReconcileData rd, Channel channel = Channel.Unreliable)
-    {
-        var position = new Vector3d(rd.PositionX, rd.PositionY, rd.PositionZ);
-        var local_pos = position - OffsetBehaviour.manager.GetLocalOffset(gameObject.scene);
-
-        rb.position = new Vector3((float)local_pos.x, (float)local_pos.y, (float)local_pos.z);
-
-        transform.rotation = rd.Rotation;
-        rb.velocity = rd.Velocity;
-        rb.angularVelocity = rd.AngularVelocity;
-        rotationInPreviousFrame = rd.RotationInPreviousFrame;
-        currentGear = rd.CurrentGear;
-
-        Physics.SyncTransforms();
-    }
+    #endregion
 }

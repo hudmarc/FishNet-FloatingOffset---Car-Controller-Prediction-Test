@@ -937,6 +937,7 @@ GameObject:
   - component: {fileID: 3026152992423053119}
   - component: {fileID: 3405384698918056248}
   - component: {fileID: 3382107804840095524}
+  - component: {fileID: -1658720520004387656}
   m_Layer: 0
   m_Name: AICar
   m_TagString: Untagged
@@ -1124,7 +1125,8 @@ MonoBehaviour:
   <PredictedSpawn>k__BackingField: {fileID: 0}
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
-  - {fileID: 0}
+  - {fileID: 3382107804840095524}
+  - {fileID: -1658720520004387656}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -1135,7 +1137,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584101953504591708
+  _initializedTimestamp: -8584101879729772958
   _localLevelOfDetailCalculationType: 0
   _useLevelOfDetail: 0
   _useRootLevelOfDetail: 1
@@ -1200,11 +1202,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3298b6c5b5132453681d213cc37ed04e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 0
   _addedNetworkObject: {fileID: 6397051676162244328}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 6397051676162244328}
   targetSearchInterval: 0.2
   reverseDistanceThreshold: 3
+  stuckSpeedThreshold: 0.5
+  stuckTimeThreshold: 2
+  unstuckReverseDuration: 1.5
+  unstuckForwardDuration: 2
   visual: {fileID: 3929626302067486615}
   maxSteerAngle: 20
   motorForce: 500
@@ -1231,6 +1237,52 @@ MonoBehaviour:
   - {fileID: 4068913174666622}
   - {fileID: 4252074655309166}
   - {fileID: 4944351361650126}
+--- !u!114 &-1658720520004387656
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1610265466720824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 6397051676162244328, guid: 02e641040fb499c49a848e40f535164a, type: 3}
+  _networkObjectCache: {fileID: 6397051676162244328}
+  _componentConfiguration: 2
+  _synchronizeParent: 0
+  _packing:
+    Position: 1
+    Rotation: 1
+    Scale: 0
+  _useScaledTime: 1
+  _interpolation: 2
+  _extrapolation: 2
+  _enableTeleport: 1
+  _teleportThreshold: 1
+  _clientAuthoritative: 0
+  _sendToOwner: 1
+  _interval: 1
+  _synchronizePosition: 1
+  _positionSensitivity: 0.001
+  _positionSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeRotation: 1
+  _rotationSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeScale: 1
+  _scaleSensitivity: 0.001
+  _scaleSnapping:
+    X: 0
+    Y: 0
+    Z: 0
 --- !u!1 &1672185482629448
 GameObject:
   m_ObjectHideFlags: 0
