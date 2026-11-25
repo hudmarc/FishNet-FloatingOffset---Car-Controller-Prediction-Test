@@ -4,18 +4,22 @@
 
 This is my attempt at trying to adapt [an existing CSP car controller](https://github.com/Roceh/FishNet---Car-Controller-Prediction-Test) to use my [floating offset](https://github.com/hudmarc/FloatingOffset) package.
 
-https://github.com/user-attachments/assets/2a9bc9ae-5974-4382-97b6-190bbaac3f85
+
+
+https://github.com/user-attachments/assets/794c6731-bb2b-4073-9e0f-b35f3f6c8e3e
+
+
 
 ## Known issues
-- ~~Jitter on clients~~ Mostly fixed, seemed to be caused by running the physics loop on PostTick instead of Tick
 - No camera smoothing
-- ~~Desync on clients on scene transfer/rebase~~ To fix this use OffsetRigidbody and OffsetWheels on the root of your vehicles.
-- Cinemachine does not work with FloatingOffset, I'm investigating what I could do to fix this
+- ~~Desync on clients on scene transfer/rebase~~ Knowkn issue with PhysX Wheels. To fix use OffsetWheels on the root of your vehicles.
+- Cinemachine does not currently work with FloatingOffset
 
 ## How to install
 - Install FishNet from the Unity Asset Store
 - Click "Add package from git URL..." in the Unity Package Manager (UPM) and paste in https://github.com/hudmarc/FFO-FishNet-Floating-Origin.git
-- [ParrelSync](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://github.com/VeriorPies/ParrelSync&ved=2ahUKEwiw7IHfqb-UAxXCUMMIHfykCa4QFnoECA8QAQ&usg=AOvVaw0eEHgZuqEmuzfgLX-tsBtY) is very helpful for locally testing multiple clients.
+- Download this Git repo and extract it into your project directory, then make sure `CarControllerScene` is in your build settings.
+- I recommend [ParrelSync](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://github.com/VeriorPies/ParrelSync&ved=2ahUKEwiw7IHfqb-UAxXCUMMIHfykCa4QFnoECA8QAQ&usg=AOvVaw0eEHgZuqEmuzfgLX-tsBtY) for easily testing multiple clients locally.
 
 ## FAQ
 
@@ -24,19 +28,17 @@ https://github.com/user-attachments/assets/2a9bc9ae-5974-4382-97b6-190bbaac3f85
 `CarController/Scenes/` contains the main game scene. The FloatingOffsetManager is built for a separated game scene and offline scene with the managers, but apparently this works too. Remember to add it to build settings before testing.
 
 ### Why is everything rebasing so often?
-I set the minimum join distance to 50 meters, which is ridiculously low, so that the Floating Offset behavior is more obvious. This makes debugging easier because rebases/scene transfers etc happen much more often.
+I set the minimum join distance quite low in the demo, which is quite low, so that the Floating Offset behavior is more obvious. This makes debugging easier because rebases/scene transfers etc happen much more often. If you want to change this, the settings are in the component `FishNetOfffsetManager` under `Configuration`
 
 ### Why do things pop in suddenly?
 
-See the `OffsetCondition` on the `ObserverManager`. It ensures that clients can only see other clients if they are in the same Offset Scene.
+See the `SceneCondition` on the `ObserverManager`. It ensures that clients can only see other clients if they are in the same Offset Scene.
 
 ### How do I configure stuff?
 
-To change offset settings etc look at `DefaultOffsetUniverse` and change the settings there. `OffsetCondition` lets you change when clients are shown objects.
+To change offset settings etc look at `DefaultOffsetUniverse` and change the settings there.
 
-To add a new tracked entity simply add an `OffsetTransform` and set `isView` to `True`
-
-https://github.com/user-attachments/assets/92f08723-80dd-4d44-baaa-3fd25da893e1
+To add a new tracked entity simply add an `OffsetView`. If it is a player, remember to set `IsPlayer = true`
 
 ---
 #### Free assets used
