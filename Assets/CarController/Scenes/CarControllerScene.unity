@@ -970,12 +970,12 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 934570884, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
       propertyPath: _defaultConditions.Array.size
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 934570884, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
       propertyPath: _defaultConditions.Array.data[0]
       value: 
-      objectReference: {fileID: 11400000, guid: 2033f54fd2794464bae08fa5a55c8996, type: 2}
+      objectReference: {fileID: 11400000, guid: 7e08cd311d7684e3e956ab5b58aedfba, type: 2}
     - target: {fileID: 934570884, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
       propertyPath: _defaultConditions.Array.data[1]
       value: 
@@ -1103,6 +1103,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7443408887813606051, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
       insertIndex: -1
       addedObject: {fileID: 329493283}
+    - targetCorrespondingSourceObject: {fileID: 7443408887813606051, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 329493288}
   m_SourcePrefab: {fileID: 100100000, guid: 0b650fca685f2eb41a86538aa883e4c1, type: 3}
 --- !u!1 &329493267 stripped
 GameObject:
@@ -1194,6 +1197,19 @@ MonoBehaviour:
     Hysteresis: 100
     MaxScenes: 10
     logging: 0
+  offsetter: {fileID: 0}
+--- !u!114 &329493288
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 329493267}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 492b8c7077ea14b81b6420e9207d6a62, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &372885010
 GameObject:
   m_ObjectHideFlags: 0

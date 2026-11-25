@@ -14,16 +14,19 @@ public class UniqueViewSpawner : OffsetBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        manager.OnOffsetServerInitialized += OnOffsetServerInitialized;
+        OffsetManager.OnOffsetProcessorStateChange += OnOffsetProcessorStateChange;
     }
 
     void OnDestroy()
     {
-        manager.OnOffsetServerInitialized -= OnOffsetServerInitialized;
+        OffsetManager.OnOffsetProcessorStateChange -= OnOffsetProcessorStateChange;
     }
-    void OnOffsetServerInitialized()
+    void OnOffsetProcessorStateChange(bool hasOffsetProcessor)
     {
-        Vector3d quantized = HashGrid.Quantize(manager.GetLocalOffset(gameObject.scene) + OffsetUtils.ToVector3d(transform.position), 1);
+        if (!hasOffsetProcessor)
+            return;
+
+        Vector3d quantized = HashGrid.Quantize(manager.GetLocalOffset(gameObject.scene) + transform.position.ToVector3d(), 1);
 
         if (!quantized_spawns.Contains(quantized))
         {
